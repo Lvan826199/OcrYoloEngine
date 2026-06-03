@@ -21,9 +21,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 文档 | 作用 |
 |------|------|
+| `docs/README.md` | **文档中心索引**，按分类归档导航 |
 | `docs/DEVELOPMENT.md` | **开发主线索引 + 进度表 + 约定速查**，跨会话接手的第一入口 |
-| `docs/superpowers/specs/2026-06-03-recognition-service-design.md` | 设计 spec：需求与架构的权威来源 |
-| `docs/superpowers/plans/2026-06-03-recognition-service.md` | 实现计划：逐任务 TDD 步骤与完整代码 |
+| `docs/specs/2026-06-03-recognition-service-design.md` | 设计 spec：需求与架构的权威来源 |
+| `docs/plans/2026-06-03-recognition-service.md` | 实现计划：逐任务 TDD 步骤与完整代码 |
 | `docs/adr/` | 架构决策记录（MADR），重要技术取舍逐条记录 |
 
 规则：

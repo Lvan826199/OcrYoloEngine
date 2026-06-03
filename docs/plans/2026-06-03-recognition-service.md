@@ -1,6 +1,6 @@
 # OcrYoloEngine 视觉识别服务 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **执行说明:** 按 TDD 逐任务实现本计划——每个任务「先写失败测试 → 跑红 → 最小实现 → 跑绿 → 提交」。步骤用复选框(`- [ ]`)标记完成进度。
 
 **Goal:** 实现一个面向自动化测试的视觉识别 HTTP 服务,统一封装 OCR / YOLO / 模板匹配三种识别手段,只做推理、返回坐标与文字,不执行动作。
 
@@ -3427,7 +3427,7 @@ uv run ocr-yolo infer img.png --methods ocr   # 本地单图推理
 ```markdown
 ## 架构
 
-分层单体:`service`(FastAPI/v1)→ `concurrency`(有界池+模型锁)→ `preprocessing`(通道统一/ROI 回映射)→ `recognizers`(ocr/yolo/template 统一抽象)→ `models.registry`/`templates.store`(资产管理)。识别器只吃预处理图、吐基于输入图坐标的 `RawDetection`,坐标回映射与归一化统一在 `preprocessing.finalize_detections`。详见 `docs/superpowers/specs/2026-06-03-recognition-service-design.md` 与 `docs/superpowers/plans/2026-06-03-recognition-service.md`。
+分层单体:`service`(FastAPI/v1)→ `concurrency`(有界池+模型锁)→ `preprocessing`(通道统一/ROI 回映射)→ `recognizers`(ocr/yolo/template 统一抽象)→ `models.registry`/`templates.store`(资产管理)。识别器只吃预处理图、吐基于输入图坐标的 `RawDetection`,坐标回映射与归一化统一在 `preprocessing.finalize_detections`。详见 `docs/specs/2026-06-03-recognition-service-design.md` 与 `docs/plans/2026-06-03-recognition-service.md`。
 ```
 
 - [ ] **Step 6: 全量测试 + 收尾提交**

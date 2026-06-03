@@ -18,8 +18,9 @@
 
 | 文档 | 作用 | 何时更新 |
 |---|---|---|
-| `docs/superpowers/specs/2026-06-03-recognition-service-design.md` | **设计 spec**:背景/范围/架构/数据模型/接口/测试/安全等,需求与架构的权威来源 | 需求或架构变化时 |
-| `docs/superpowers/plans/2026-06-03-recognition-service.md` | **实现计划**:22 任务、8 阶段,逐任务 TDD 步骤与完整代码 | 任务拆分或实现策略调整时 |
+| `docs/README.md` | **文档中心索引**:按分类(specs/plans/adr)归档导航 | 新增文档分类或条目时 |
+| `docs/specs/2026-06-03-recognition-service-design.md` | **设计 spec**:背景/范围/架构/数据模型/接口/测试/安全等,需求与架构的权威来源 | 需求或架构变化时 |
+| `docs/plans/2026-06-03-recognition-service.md` | **实现计划**:22 任务、8 阶段,逐任务 TDD 步骤与完整代码 | 任务拆分或实现策略调整时 |
 | `docs/DEVELOPMENT.md`(本文件) | **开发主线索引 + 进度表 + 约定速查** | 每完成一个任务 |
 | `docs/adr/` | 架构决策记录(MADR) | 做出重要技术取舍时新增一条 |
 | `CLAUDE.md` | 给 Claude Code 的工作规则(语言/提交/文档引用/报错必修等) | 规则变化时 |

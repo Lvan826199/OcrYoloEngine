@@ -115,9 +115,10 @@ _待补充：提供推理 / 训练的最小示例。_
 
 项目的设计与实现细节由以下文档持续维护，参与开发前请先阅读：
 
+- 🗃️ [文档中心（分类索引）](docs/README.md) —— 所有开发文档的统一入口。
 - 📌 [开发主线索引与进度](docs/DEVELOPMENT.md) —— **跨会话接手的第一入口**：文档地图、任务进度表、关键约定速查。
-- 📐 [设计文档（spec）](docs/superpowers/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
-- 🗂️ [实现计划](docs/superpowers/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
+- 📐 [设计文档（spec）](docs/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
+- 🗂️ [实现计划](docs/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
 - 🧭 [架构决策记录（ADR）](docs/adr/) —— 重要技术取舍的逐条记录。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
