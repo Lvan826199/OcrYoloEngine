@@ -1,0 +1,365 @@
+# OcrYoloEngine 视觉识别服务 — 设计文档
+
+- 日期：2026-06-03
+- 作者：vincent
+- 状态：已定稿，待评审
+
+---
+
+## 1. 背景与目标
+
+`OcrYoloEngine` 是一个面向**自动化测试**的视觉识别服务。其他自动化脚本服务在执行时截图，把图片发给本服务，本服务完成识别并返回结果（坐标、文字、置信度等），**不负责执行点击等动作**。
+
+典型使用场景：
+
+- 手机 App 截图的文字定位
+- Web 端元素定位
+- 手机移动端游戏的复杂图像定位（设置按钮、角色、休闲/策略游戏元素等）
+
+识别手段有三种、互补：
+
+- **OCR**：仅做文字识别（PaddleOCR）。
+- **YOLO**：图像目标检测/分类，返回坐标 + 置信度（ultralytics，v8/v11），支持为特定游戏训练专用模型。
+- **模板匹配**：OpenCV 模板/特征匹配（类似 airtest），适合固定不变的图标。
+
+### 设计目标
+
+1. 三种识别方法统一接口、统一结果结构，调用方拿到全字段后自行筛选。
+2. 服务**只做推理**；**训练独立成入口**，与主功能物理隔离。
+3. 多模型**按需加载、可切换**，带版本与淘汰策略。
+4. **CPU/GPU 均可运行**，GPU 可选，默认能在 CPU 跑。
+5. 接口为 HTTP；图片支持 base64/上传，也支持同机部署时直接传**本地路径**。
+6. 从一开始就预留并发、可测试、可观测、安全等接缝，降低后期技术债务。
+
+---
+
+## 2. 范围
+
+### 目标（首版交付）
+
+- FastAPI HTTP 服务，`/v1` 版本化路由。
+- OCR / YOLO / 模板匹配三种识别器，统一抽象与结果结构。
+- 模型注册表 + 模板库：按名加载、版本化、LRU 淘汰、显式卸载/重载。
+- 统一预处理层：通道顺序统一、ROI 裁剪与坐标回映射、输入校验与上限。
+- 并发与背压：有界工作池 + 每模型锁 + 过载 503。
+- 统一错误契约；结构化日志 + request_id + 基础指标；可选 debug 标注图。
+- CPU/GPU 设备配置 + 依赖懒加载 + extras + CPU/GPU 两套 Dockerfile。
+- 可测试接缝：识别器抽象、可注入假实现、golden 测试。
+- 质量门禁：ruff + mypy + pytest + pre-commit。
+- 独立训练入口 `training/`（ultralytics 训练脚本 + 数据集约定），服务运行时不导入。
+- 基础鉴权（API Key）。
+
+### 非目标（本版不做，但留扩展点）
+
+- 不执行任何 UI 动作（点击、滑动等）。
+- 不做模型训练的自动化编排/调参（训练入口仅提供基础脚本与约定）。
+- 不做分布式/多机推理集群（先单服务多 worker）。
+- 结果缓存仅"留哈希位"，不实现缓存层。
+- ROI 在首版打通核心后落地（接口与数据结构先预留）。
+
+---
+
+## 3. 总体架构
+
+采用**分层单体服务**（方案 A）。一个服务进程，三种识别器各自独立模块、共用统一接口；资产管理（模型/模板）、预处理、并发、错误契约、配置各成一层。训练作为独立目录，服务运行时绝不 import。
+
+```
+                ┌─────────────────────────────────────────────┐
+   HTTP 请求 ──▶│ service (FastAPI, /v1, 鉴权, 路由, 错误处理) │
+                └───────────────┬─────────────────────────────┘
+                                ▼
+                ┌─────────────────────────────────────────────┐
+                │ concurrency (有界工作池 + 每模型锁 + 背压)   │
+                └───────────────┬─────────────────────────────┘
+                                ▼
+   image/loader ──▶ preprocessing(通道统一/ROI裁剪/坐标映射)
+                                ▼
+                ┌──────────── recognizers (统一抽象) ─────────┐
+                │   ocr        yolo            template        │
+                │ (PaddleOCR) (ultralytics)  (OpenCV)          │
+                └───────┬───────────┬──────────────┬──────────┘
+                        ▼           ▼              ▼
+                 models.registry          templates.store
+                 (按名加载/版本/LRU)       (模板库/版本)
+```
+
+---
+
+## 4. 目录结构
+
+```
+OcrYoloEngine/
+├── pyproject.toml              # 依赖+打包+工具配置；CPU/GPU 用 extras 区分
+├── uv.lock                     # 锁定依赖版本
+├── configs/
+│   ├── models.yaml             # 模型名 → 权重路径/版本/类别映射
+│   └── templates.yaml          # 模板名 → 模板图路径/版本/匹配参数
+├── docker/
+│   ├── Dockerfile.cpu
+│   └── Dockerfile.gpu
+├── src/ocr_yolo_engine/
+│   ├── __init__.py
+│   ├── settings.py             # pydantic-settings：设备/阈值/目录/并发/鉴权
+│   ├── schemas.py              # 请求/响应/Detection 数据模型(pydantic)
+│   ├── errors.py               # 统一错误码与异常 → HTTP 错误契约
+│   ├── image/
+│   │   └── loader.py           # 来源：base64 / 本地路径(白名单) / 上传
+│   ├── preprocessing/
+│   │   └── pipeline.py         # 通道顺序统一、ROI 裁剪、坐标回映射、上限校验
+│   ├── recognizers/
+│   │   ├── base.py             # Recognizer 抽象基类 + Detection 统一结果
+│   │   ├── ocr.py              # PaddleOCR 封装
+│   │   ├── yolo.py             # ultralytics 封装
+│   │   └── template.py         # OpenCV 模板匹配(多尺度/多目标/NMS)
+│   ├── models/
+│   │   └── registry.py         # 模型按需加载 + 版本 + LRU + 卸载/重载
+│   ├── templates/
+│   │   └── store.py            # 模板库：加载 + 版本 + 缓存
+│   ├── concurrency/
+│   │   └── executor.py         # 有界工作池 + 每模型锁 + 背压(503)
+│   ├── observability/
+│   │   └── logging.py          # 结构化日志 + request_id + 计时/指标
+│   ├── service/
+│   │   ├── app.py              # FastAPI 应用装配
+│   │   ├── routes.py           # /v1 路由：ocr/detect/match/recognize/health/ready/models
+│   │   ├── auth.py             # API Key 鉴权依赖
+│   │   └── deps.py             # 依赖注入(便于测试注入 fake)
+│   └── cli.py                  # CLI：启动服务 / 单图推理
+├── training/                   # 🔒 独立训练入口，服务运行时不导入
+│   ├── README.md
+│   ├── train.py                # ultralytics 训练脚本
+│   ├── dataset.md              # 数据集与标注约定(YOLO 格式)
+│   └── configs/example.yaml
+├── models_store/               # 训练好的权重(被 .gitignore 忽略)
+│   └── .gitkeep
+├── templates_store/            # 模板图库(纳入版本管理或按需忽略)
+│   └── .gitkeep
+├── tests/
+│   ├── conftest.py
+│   ├── fakes/                  # 假识别器/假注册表，免加载真实模型
+│   ├── fixtures/               # golden 样例图 + 期望结果
+│   ├── unit/
+│   ├── contract/               # HTTP API 契约测试
+│   └── smoke/                  # 真实模型冒烟测试(打 marker，CI 可选)
+├── .pre-commit-config.yaml
+└── docs/...
+```
+
+> `.gitignore` 需补充：`models_store/`(权重)、`uv` 缓存等；`templates_store/` 视体积决定是否纳管。
+
+---
+
+## 5. 核心组件设计
+
+### 5.1 配置 `settings.py`（pydantic-settings）
+
+集中读取环境变量 + 默认值，便于多环境部署。关键项：
+
+| 配置项 | 默认 | 说明 |
+|---|---|---|
+| `device` | `auto` | `auto`/`cpu`/`cuda`；auto 检测到 GPU 用 GPU 否则 CPU |
+| `default_conf_threshold` | `0.25` | YOLO 默认置信度阈值，可被请求覆盖 |
+| `models_config_path` | `configs/models.yaml` | 模型注册表 |
+| `templates_config_path` | `configs/templates.yaml` | 模板库 |
+| `model_cache_size` | `3` | 模型 LRU 上限(防 OOM/显存爆) |
+| `max_workers` | `4` | 推理工作池大小 |
+| `max_queue` | `32` | 等待队列上限，超出返回 503 |
+| `request_timeout_s` | `30` | 单请求超时 |
+| `max_image_bytes` | `10MB` | 输入大小上限 |
+| `max_image_pixels` | `4096x4096` | 输入分辨率上限(防 decompression bomb) |
+| `allowed_path_roots` | `[]` | 本地路径输入白名单根目录 |
+| `api_keys` | `[]` | 允许的 API Key 列表(空则关闭鉴权，便于本地) |
+| `warmup` | `true` | 启动时预热已配置模型 |
+
+### 5.2 数据模型 `schemas.py`
+
+**请求(统一)**：
+
+```python
+class RecognizeRequest:
+    image: ImageInput            # 见下；三选一
+    methods: list[Method]        # ["ocr"|"yolo"|"template"]，可多选(合并接口)
+    model: str | None            # YOLO 模型名(yolo 方法必填)
+    templates: list[str] | None  # 模板名列表(template 方法用)
+    conf_threshold: float | None # 覆盖默认阈值
+    roi: ROI | None              # 可选：[x, y, w, h]，预留
+    debug: bool = False          # 是否返回标注图
+
+class ImageInput:                # 三选一
+    base64: str | None
+    path: str | None             # 受 allowed_path_roots 白名单约束
+    # multipart 上传走独立端点
+```
+
+**统一结果 `Detection`**：
+
+```python
+class Detection:
+    source: Method               # "ocr"/"yolo"/"template"
+    label: str | None            # YOLO 类别 / 模板名；OCR 为 None
+    text: str | None             # OCR 识别文字；其余为 None
+    confidence: float            # 置信度/相似度，0~1
+    bbox: list[float]            # [x1, y1, x2, y2]，全图原始像素坐标
+    center: list[float]          # [cx, cy]，全图原始像素坐标
+    bbox_norm: list[float]       # 归一化 [x1,y1,x2,y2]，0~1
+    center_norm: list[float]     # 归一化中心点，0~1
+```
+
+**响应**：
+
+```python
+class RecognizeResponse:
+    request_id: str
+    image_size: list[int]        # [width, height]
+    method_results: dict[Method, MethodResult]   # 各方法的结果 + 用到的模型/模板版本 + 耗时
+    debug_image: str | None      # base64 标注图(debug=true 时)
+```
+
+`MethodResult` 内含 `detections: list[Detection]`、`model_version`/`template_versions`、`elapsed_ms`。
+
+### 5.3 图片加载 `image/loader.py` 与预处理 `preprocessing/pipeline.py`
+
+- **来源三选一**：base64 解码 / 本地路径(经 `allowed_path_roots` 规范化校验，**防路径穿越**) / multipart 上传(独立端点)。
+- **输入校验**：大小、格式、分辨率上限；超限抛结构化错误。
+- **通道顺序统一**：内部统一以 RGB(或显式约定)流转，封装 BGR↔RGB 转换，**杜绝各识别器各自为政导致的颜色错乱**。
+- **ROI**：按 `[x,y,w,h]` 裁剪；识别器在裁剪图上得到的坐标，**统一加偏移回映射到全图**，并据全图尺寸计算归一化坐标。回映射逻辑集中在此层，识别器不各自处理。
+
+### 5.4 识别器 `recognizers/`
+
+抽象基类定义统一契约：
+
+```python
+class Recognizer(ABC):
+    @abstractmethod
+    def infer(self, image: ndarray, ctx: InferContext) -> list[Detection]: ...
+```
+
+- `ocr.py`：PaddleOCR，中英文+数字；输出每行文字 + 框 + 置信度。
+- `yolo.py`：ultralytics；从 `registry` 取指定模型；输出类别 + 框 + 置信度；应用阈值。
+- `template.py`：OpenCV `matchTemplate`，支持**多尺度匹配**、**多目标返回 + NMS 去重**、阈值可调；模板来自 `templates.store`。
+
+所有识别器只接收已预处理图与上下文，返回 `Detection` 列表；坐标映射、归一化由上层统一完成（识别器返回基于输入图的坐标，预处理层负责回映射）。
+
+### 5.5 资产管理：模型 `models/registry.py` 与模板 `templates/store.py`
+
+- **模型注册表**：从 `models.yaml` 读 `名称→{路径, 版本, 类别表}`；首次使用懒加载并缓存；**LRU 上限淘汰**；提供 `unload(name)` 与 `reload(name)` 入口（不重启换模型）；返回结果带 `model_version`。
+- **模板库**：与注册表对称；`templates.yaml` 配 `名称→{路径, 版本, 匹配参数}`；加载缓存；带版本。
+- 版本/哈希进入响应，保证测试可复现、问题可追溯。
+
+### 5.6 并发与背压 `concurrency/executor.py`
+
+- 推理是 CPU/GPU 密集的同步操作，**不在事件循环里直接跑**：经**有界线程池**提交，避免阻塞 FastAPI async。
+- **每模型一把锁**(或单飞)，对同一模型/同一 GPU 串行化，规避模型非线程安全。
+- 队列超过 `max_queue` 立即返回 **503 + Retry-After**（背压），不堆积拖垮服务。
+- 单请求 `request_timeout_s` 超时返回 504。
+
+### 5.7 错误契约 `errors.py`
+
+统一错误响应体：`{request_id, error_code, message, details?}`。明确区分：
+
+- **成功有目标** → 200 + 非空 detections
+- **成功无目标** → 200 + 空 detections（**不是错误**）
+- **处理失败** → 4xx/5xx + 结构化 error_code（如 `INVALID_IMAGE`、`MODEL_NOT_FOUND`、`PATH_NOT_ALLOWED`、`OVERLOADED`、`TIMEOUT`）
+
+### 5.8 HTTP 服务 `service/`
+
+- 路由前缀 `/v1`。
+- 端点：
+  - `POST /v1/ocr`、`POST /v1/detect`、`POST /v1/match`：单方法。
+  - `POST /v1/recognize`：**合并接口**，按 `methods` 跑多种并合并(P2 留口子，首版可先串行实现)。
+  - `POST /v1/recognize/upload`：multipart 上传变体。
+  - `GET /v1/models`、`GET /v1/templates`：列出可用资产及版本。
+  - `GET /health`(存活)、`GET /ready`(模型就绪)。
+- **鉴权**：`auth.py` 提供 API Key 依赖；`api_keys` 为空时关闭(本地友好)。
+- **依赖注入** `deps.py`：注册表、识别器、执行器通过 DI 提供，**测试可注入 fake**。
+
+### 5.9 CLI `cli.py`
+
+- `ocr-yolo serve`：启动服务。
+- `ocr-yolo infer <图片> --methods ... --model ...`：本地单图推理，便于调试。
+- 重依赖懒加载，保证 `--help` 与轻量命令不触发 torch/paddle 导入。
+
+### 5.10 训练入口 `training/`（隔离）
+
+- 独立目录，**不被 `src/` import**；有独立 README。
+- `train.py`：基于 ultralytics 的训练脚本；`dataset.md` 说明 YOLO 数据集与标注格式；`configs/example.yaml` 示例。
+- 产出权重放 `models_store/`，在 `configs/models.yaml` 登记即可被服务加载。
+
+---
+
+## 6. 数据流（以一次 detect 请求为例）
+
+```
+调用方截图
+  └─HTTP POST /v1/detect (base64/path + model + conf + roi? + debug?)
+      └─ 鉴权(API Key)
+          └─ loader 载图 + 校验上限/白名单
+              └─ preprocessing: 通道统一 + ROI 裁剪
+                  └─ executor: 入队(满则503) → 工作池 + 模型锁
+                      └─ registry 取模型(懒加载/缓存) → yolo.infer
+                          └─ preprocessing: 坐标回映射 + 归一化
+                              └─ 组装 Detection 列表 (+debug 标注图)
+                                  └─ 200 响应 (含 model_version, elapsed_ms)
+```
+
+---
+
+## 7. 测试策略（SDET 重点）
+
+- **单元测试** `tests/unit/`：预处理(通道/ROI 回映射/上限)、错误契约、注册表 LRU、模板 NMS、坐标映射等纯逻辑，全部用小 fixture，不加载真实模型。
+- **假实现** `tests/fakes/`：`FakeRecognizer`/`FakeRegistry`，让服务层与并发层在**不加载真实模型**下被完整测试。
+- **契约测试** `tests/contract/`：对 HTTP API 校验请求/响应 schema、错误码、状态区分(有目标/无目标/失败)。
+- **golden 测试** `tests/fixtures/`：固定样例图 + 期望结果(坐标/置信度带容差)，防模型/预处理改动悄悄改变行为。
+- **冒烟测试** `tests/smoke/`：加载真实模型跑端到端，打 `@pytest.mark.smoke`，CI 中可选/夜间跑。
+- DI 接缝保证以上可行；CI 默认只跑 unit/contract/golden(快)，smoke 单独触发。
+
+---
+
+## 8. 依赖与打包
+
+- **uv + pyproject.toml**；`uv.lock` 精确锁版本。
+- **extras**：`[cpu]` / `[gpu]` 区分 paddlepaddle/torch 的 CPU/GPU 包。
+- **重依赖懒加载**：仅在对应识别器首次使用时 import torch/paddle，避免无谓的导入开销与冲突。
+- **Docker**：`docker/Dockerfile.cpu` 与 `Dockerfile.gpu`，把"装不上"挡在镜像里；模型/模板目录以 volume 挂载。
+
+---
+
+## 9. 安全
+
+- 本地路径输入：规范化后必须落在 `allowed_path_roots` 白名单内，否则 `PATH_NOT_ALLOWED`，**防路径穿越/任意文件读取**。
+- 输入大小/分辨率上限，防内存打爆与 decompression bomb。
+- API Key 鉴权(可关闭以便本地)。
+
+---
+
+## 10. 可观测性
+
+- 结构化日志，贯穿 `request_id`。
+- 每方法/模型的耗时、成功率指标(先日志计数，预留 Prometheus 端点)。
+- `debug=true` 时返回(或落盘)标注图，便于排查"为什么没定位到"。
+
+---
+
+## 11. 质量门禁
+
+- `ruff`(lint+format)、`mypy`(类型)、`pytest`(测试)配置进 `pyproject.toml`。
+- `.pre-commit-config.yaml` 接入上述检查。
+- CI：Gitee Go 流水线或文档化的本地命令(首版至少文档化 + pre-commit)。
+
+---
+
+## 12. 未决与风险
+
+- **PaddlePaddle 与 PyTorch 同环境的 CUDA 版本兼容**：以锁版本 + Docker 镜像缓解；首版优先保证 CPU 路径稳定可用。
+- **模板匹配对缩放/旋转的鲁棒性**：首版做多尺度，旋转不变性列为后续(必要时引入特征点匹配 ORB/SIFT)。
+- **不同设备分辨率与训练分辨率差异**：通过返回归一化坐标 + 文档约定缓解。
+- `/recognize` 合并接口的多方法**合并/优先级策略**：首版串行执行并各自返回，智能合并(先模板不中再 YOLO 等)列为后续。
+
+---
+
+## 13. 后续(留扩展点，本版不实现)
+
+- 结果缓存(按图哈希)：首版仅预留哈希计算位。
+- ROI 的完整落地(首版预留字段与裁剪/回映射框架)。
+- `/recognize` 的智能方法编排与结果合并。
+- 训练编排/调参、分布式推理、Prometheus 指标端点、特征点匹配。
