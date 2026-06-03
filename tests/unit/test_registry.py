@@ -14,7 +14,9 @@ def _specs():
 
 def test_get_lazy_loads_and_caches():
     calls = []
-    reg = ModelRegistry(_specs(), loader_fn=lambda s: calls.append(s.name) or f"obj-{s.name}", cache_size=3)
+    reg = ModelRegistry(
+        _specs(), loader_fn=lambda s: calls.append(s.name) or f"obj-{s.name}", cache_size=3
+    )
     assert reg.get("a") == "obj-a"
     assert reg.get("a") == "obj-a"
     assert calls == ["a"]

@@ -19,7 +19,9 @@ def test_recognizer_is_abstract():
 def test_concrete_recognizer_runs():
     class Echo(Recognizer):
         def infer(self, image, ctx):
-            return [RawDetection(source="ocr", label=None, text="x", confidence=1.0, bbox=[0, 0, 1, 1])]
+            return [
+                RawDetection(source="ocr", label=None, text="x", confidence=1.0, bbox=[0, 0, 1, 1])
+            ]
 
     out = Echo().infer(np.zeros((2, 2, 3), dtype=np.uint8), InferContext(conf_threshold=0.25))
     assert out[0].text == "x"

@@ -13,7 +13,9 @@ def _write_png(path, w=6, h=6):
 def test_get_loads_and_caches(tmp_path):
     p = tmp_path / "icon.png"
     _write_png(p)
-    specs = {"icon": TemplateSpec(name="icon", path=str(p), version="v1", params={"threshold": 0.8})}
+    specs = {
+        "icon": TemplateSpec(name="icon", path=str(p), version="v1", params={"threshold": 0.8})
+    }
     store = TemplateStore(specs)
     img1 = store.get_image("icon")
     img2 = store.get_image("icon")
