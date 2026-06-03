@@ -10,7 +10,7 @@
 
 ### 报告问题
 
-通过 [Issues](https://gitee.com/xiaozai6/OcrYoloEngine/issues) 提交 bug 或需求。提交 bug 时请尽量包含：
+通过 [Issues](https://gitee.com/xiaozai-van-liu/OcrYoloEngine/issues) 提交 bug 或需求。提交 bug 时请尽量包含：
 
 - 问题的清晰描述与复现步骤
 - 期望行为与实际行为

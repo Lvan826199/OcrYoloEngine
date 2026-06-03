@@ -15,6 +15,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本仓库目前处于早期脚手架阶段，仅包含说明文档与配置文件，**尚无源码、构建配置或测试套件**。下文记录的是当前已知信息，需随代码演进逐步补全。**在相关文件真正加入仓库之前，不要假设某些命令或模块已经存在。**
 
+## 文档引用规则（强制）
+
+本仓库的开发主线由以下文档承载，**每个会话开始前先读 `docs/DEVELOPMENT.md` 掌握进度与约定**：
+
+| 文档 | 作用 |
+|------|------|
+| `docs/DEVELOPMENT.md` | **开发主线索引 + 进度表 + 约定速查**，跨会话接手的第一入口 |
+| `docs/superpowers/specs/2026-06-03-recognition-service-design.md` | 设计 spec：需求与架构的权威来源 |
+| `docs/superpowers/plans/2026-06-03-recognition-service.md` | 实现计划：逐任务 TDD 步骤与完整代码 |
+| `docs/adr/` | 架构决策记录（MADR），重要技术取舍逐条记录 |
+
+规则：
+
+- **每完成一个任务**，回 `docs/DEVELOPMENT.md` 更新「进度表」（标 ✅ + 完成日期）。
+- 改动 spec / plan 后，必须同步 `docs/DEVELOPMENT.md` 的进度与约定。
+- 新增或调整工作规则时，同步进本文件（CLAUDE.md）与 `README.md`。
+- 有用户可见变更时更新 `CHANGELOG.md`；涉及架构取舍时在 `docs/adr/` 新增一条。
+
+## 报错必修（强制）
+
+**存在任何报错（测试失败、`ruff`/`mypy` 报错、构建失败）必须先修复，修复后全绿才允许 `git commit` / `git push`。** 严禁带着已知报错提交或推送代码。
+
 ## 项目简介
 
 `OcrYoloEngine` 是一个 OCR + YOLO 引擎。根据 `.gitignore` 判断，这是一个 **Python** 项目，使用 PyTorch / ONNX 格式的模型权重（`*.pt`、`*.pth`、`*.weights`、`*.onnx`）。这些权重文件已被 git 忽略，**不应提交入库**，需单独获取或下载。

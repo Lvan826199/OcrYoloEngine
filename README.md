@@ -15,9 +15,9 @@ https://github.com/othneildrew/Best-README-Template
   <a href="#关于项目"><strong>探索文档 »</strong></a>
   <br />
   <br />
-  <a href="https://gitee.com/xiaozai6/OcrYoloEngine/issues">报告问题</a>
+  <a href="https://gitee.com/xiaozai-van-liu/OcrYoloEngine/issues">报告问题</a>
   ·
-  <a href="https://gitee.com/xiaozai6/OcrYoloEngine/issues">提出需求</a>
+  <a href="https://gitee.com/xiaozai-van-liu/OcrYoloEngine/issues">提出需求</a>
 </p>
 
 <!-- 徽章（占位，待 CI / License 等就绪后替换为真实徽章） -->
@@ -43,6 +43,7 @@ https://github.com/othneildrew/Best-README-Template
       </ul>
     </li>
     <li><a href="#使用方法">使用方法</a></li>
+    <li><a href="#开发文档">开发文档</a></li>
     <li><a href="#路线图">路线图</a></li>
     <li><a href="#贡献">贡献</a></li>
     <li><a href="#许可证">许可证</a></li>
@@ -85,7 +86,7 @@ https://github.com/othneildrew/Best-README-Template
 
 1. 克隆仓库
    ```sh
-   git clone https://gitee.com/xiaozai6/OcrYoloEngine.git
+   git clone https://gitee.com/xiaozai-van-liu/OcrYoloEngine.git
    cd OcrYoloEngine
    ```
 2. 创建并激活虚拟环境
@@ -110,6 +111,19 @@ _待补充：提供推理 / 训练的最小示例。_
 
 ---
 
+## 开发文档
+
+项目的设计与实现细节由以下文档持续维护，参与开发前请先阅读：
+
+- 📌 [开发主线索引与进度](docs/DEVELOPMENT.md) —— **跨会话接手的第一入口**：文档地图、任务进度表、关键约定速查。
+- 📐 [设计文档（spec）](docs/superpowers/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
+- 🗂️ [实现计划](docs/superpowers/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
+- 🧭 [架构决策记录（ADR）](docs/adr/) —— 重要技术取舍的逐条记录。
+
+<p align="right">(<a href="#readme-top">回到顶部</a>)</p>
+
+---
+
 ## 路线图
 
 - [ ] 搭建项目骨架与依赖管理
@@ -119,7 +133,7 @@ _待补充：提供推理 / 训练的最小示例。_
 - [ ] 提供 CLI / API 入口
 - [ ] 补充测试与文档
 
-详见 [开放的 Issues](https://gitee.com/xiaozai6/OcrYoloEngine/issues)。
+详见 [开放的 Issues](https://gitee.com/xiaozai-van-liu/OcrYoloEngine/issues)。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -145,7 +159,7 @@ _待补充：提供推理 / 训练的最小示例。_
 
 vincent - Lvan826199@163.com
 
-项目地址: [https://gitee.com/xiaozai6/OcrYoloEngine](https://gitee.com/xiaozai6/OcrYoloEngine)
+项目地址: [https://gitee.com/xiaozai-van-liu/OcrYoloEngine](https://gitee.com/xiaozai-van-liu/OcrYoloEngine)
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
