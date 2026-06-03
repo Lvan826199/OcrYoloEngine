@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     INVALID_IMAGE = "INVALID_IMAGE"
     IMAGE_TOO_LARGE = "IMAGE_TOO_LARGE"
     PATH_NOT_ALLOWED = "PATH_NOT_ALLOWED"
@@ -32,7 +32,9 @@ _STATUS: dict[ErrorCode, int] = {
 class EngineError(Exception):
     """业务异常:携带错误码、可读信息与结构化细节。"""
 
-    def __init__(self, code: ErrorCode, message: str, details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, code: ErrorCode, message: str, details: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message

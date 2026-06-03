@@ -2,11 +2,11 @@ import pytest
 from pydantic import ValidationError
 
 from ocr_yolo_engine.schemas import (
+    ROI,
     Detection,
     ImageInput,
     RecognizeRequest,
     RecognizeResponse,
-    ROI,
 )
 
 
