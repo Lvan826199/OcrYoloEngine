@@ -11,6 +11,7 @@ import numpy as np
 from ocr_yolo_engine.cache import CachedResult, compute_cache_key
 from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.image.loader import load_from_base64, load_from_path
+from ocr_yolo_engine.merge import merge_detections
 from ocr_yolo_engine.observability import metrics
 from ocr_yolo_engine.observability.logging import current_request_id
 from ocr_yolo_engine.preprocessing.annotate import draw_detections
@@ -85,6 +86,7 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
                 method_results=hit.method_results,
                 debug_image=None,
                 from_cache=True,
+                merged=hit.merged,
             )
 
     rgb = to_rgb(bgr)
@@ -98,40 +100,34 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
     infer_ctx = InferContext(conf_threshold=conf, model=req.model, templates=req.templates or [])
 
     method_results: dict[Method, MethodResult] = {}
-    for method in req.methods:
-        recognizer = ctx.recognizers[method]
-        model_key = req.model if method == "yolo" and req.model else method
-        started = time.perf_counter()
+    merged: list[Detection] | None = None
 
-        def _infer(r: object = recognizer) -> list[RawDetection]:
-            return r.infer(cropped, infer_ctx)  # type: ignore[attr-defined, no-any-return]
-
-        raws = ctx.executor.submit(model_key, _infer)
-        elapsed_ms = (time.perf_counter() - started) * 1000
-        metrics.record(method, elapsed_ms, ok=True)
-        detections = finalize_detections(list(raws), offset=offset, full_w=full_w, full_h=full_h)
-
-        model_version = (
-            ctx.registry.spec(req.model).version if method == "yolo" and req.model else None
-        )
-        template_versions = (
-            _template_versions(ctx, req.templates)
-            if method == "template" and req.templates
-            else None
-        )
-        method_results[method] = MethodResult(
-            detections=detections,
-            model_version=model_version,
-            template_versions=template_versions,
-            elapsed_ms=elapsed_ms,
-        )
+    if req.merge == "priority":
+        # priority 短路:按 methods 顺序逐个跑,遇首个非空 detections 即停;
+        # method_results 仅含已跑方法;merged = 命中方法的检测(全程无命中则 [])。
+        merged = []
+        for method in req.methods:
+            result = _run_single_method(
+                ctx, req, infer_ctx, cropped, offset, full_w, full_h, method
+            )
+            method_results[method] = result
+            if result.detections:
+                merged = list(result.detections)
+                break
+    else:
+        # none/concat/dedup:维持"跑所有 methods"循环,算完后统一合并。
+        for method in req.methods:
+            method_results[method] = _run_single_method(
+                ctx, req, infer_ctx, cropped, offset, full_w, full_h, method
+            )
+        merged = merge_detections(req.merge, method_results)
 
     debug_image = _build_debug_image(bgr, method_results) if req.debug else None
 
     # 写:auto/refresh 均在算完后写入(off 时 cache_on 为 False,完全绕过)。
     if cache_on and key is not None:
         metrics.cache_event("miss")
-        ctx.cache.set(key, CachedResult(method_results, [full_w, full_h]))
+        ctx.cache.set(key, CachedResult(method_results, [full_w, full_h], merged))
 
     return RecognizeResponse(
         request_id=request_id,
@@ -139,6 +135,42 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
         method_results=method_results,
         debug_image=debug_image,
         from_cache=False,
+        merged=merged,
+    )
+
+
+def _run_single_method(
+    ctx: AppContext,
+    req: RecognizeRequest,
+    infer_ctx: InferContext,
+    cropped: np.ndarray,
+    offset: tuple[int, int],
+    full_w: int,
+    full_h: int,
+    method: Method,
+) -> MethodResult:
+    """跑单个方法:并发提交推理、回映射、组装 MethodResult。供普通循环与 priority 短路共用。"""
+    recognizer = ctx.recognizers[method]
+    model_key = req.model if method == "yolo" and req.model else method
+    started = time.perf_counter()
+
+    def _infer(r: object = recognizer) -> list[RawDetection]:
+        return r.infer(cropped, infer_ctx)  # type: ignore[attr-defined, no-any-return]
+
+    raws = ctx.executor.submit(model_key, _infer)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    metrics.record(method, elapsed_ms, ok=True)
+    detections = finalize_detections(list(raws), offset=offset, full_w=full_w, full_h=full_h)
+
+    model_version = ctx.registry.spec(req.model).version if method == "yolo" and req.model else None
+    template_versions = (
+        _template_versions(ctx, req.templates) if method == "template" and req.templates else None
+    )
+    return MethodResult(
+        detections=detections,
+        model_version=model_version,
+        template_versions=template_versions,
+        elapsed_ms=elapsed_ms,
     )
 
 

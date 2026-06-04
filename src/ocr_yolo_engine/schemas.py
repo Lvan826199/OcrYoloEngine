@@ -38,6 +38,10 @@ class RecognizeRequest(BaseModel):
     debug: bool = False
     # 结果缓存模式:auto=读+写、refresh=强制算并写、off=完全绕过(仅在缓存开启时生效)。
     cache: Literal["auto", "refresh", "off"] = "auto"
+    # 多方法合并策略(仅 /recognize 生效):
+    # none=各方法分开返回(默认,现状);priority=按 methods 顺序取首个命中;
+    # dedup=汇总后跨方法 NMS 去重;concat=汇总后按置信度降序拼接。
+    merge: Literal["none", "priority", "dedup", "concat"] = "none"
 
     @model_validator(mode="after")
     def _method_requirements(self) -> RecognizeRequest:
@@ -72,6 +76,8 @@ class RecognizeResponse(BaseModel):
     method_results: dict[Method, MethodResult] = Field(default_factory=dict)
     debug_image: str | None = None
     from_cache: bool = False
+    # 合并后的统一检测列表:merge!=none 时填充,none 时为 None。
+    merged: list[Detection] | None = None
 
 
 class ErrorResponse(BaseModel):

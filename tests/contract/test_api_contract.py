@@ -285,6 +285,80 @@ def test_cache_refresh_recomputes_then_writes(scene_with_target_b64):
     assert r_auto.headers["X-Cache"] == "HIT"
 
 
+def _recognize_body(b64: str, merge: str) -> dict:
+    return {
+        "image": {"base64": b64},
+        "methods": ["template"],
+        "templates": [TEMPLATE_NAME],
+        "merge": merge,
+    }
+
+
+def test_recognize_merge_concat_fills_merged(client, scene_with_target_b64):
+    """/v1/recognize + merge=concat:merged 非空,且与单方法 detections 同量同序。"""
+    r = client.post("/v1/recognize", json=_recognize_body(scene_with_target_b64, "concat"))
+    assert r.status_code == 200
+    body = r.json()
+    dets = body["method_results"]["template"]["detections"]
+    assert dets, "含目标场景应有检出"
+    merged = body["merged"]
+    assert merged is not None
+    # 单方法时 concat 即原列表(同量、同序)。
+    assert len(merged) == len(dets)
+    assert [d["confidence"] for d in merged] == [d["confidence"] for d in dets]
+
+
+def test_recognize_merge_none_default_is_null(client, scene_with_target_b64):
+    """默认 merge=none:merged 为 None,method_results 不变(行为与改动前一致)。"""
+    r = client.post(
+        "/v1/recognize",
+        json={
+            "image": {"base64": scene_with_target_b64},
+            "methods": ["template"],
+            "templates": [TEMPLATE_NAME],
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["merged"] is None
+    assert body["method_results"]["template"]["detections"]
+
+
+def test_recognize_merge_priority_single_hit(client, scene_with_target_b64):
+    """merge=priority + 单 template 命中:merged = template 的检测。"""
+    r = client.post("/v1/recognize", json=_recognize_body(scene_with_target_b64, "priority"))
+    assert r.status_code == 200
+    body = r.json()
+    dets = body["method_results"]["template"]["detections"]
+    merged = body["merged"]
+    assert merged is not None
+    assert merged == dets
+
+
+def test_recognize_merge_cache_roundtrip_and_no_cross_contamination(scene_with_target_b64):
+    """缓存兼容:concat 连发两次第二次 HIT 且 merged 正确;同图 dedup 应 MISS(键含 merge)。"""
+    c = make_client(result_cache_size=8)
+    r1 = c.post("/v1/recognize", json=_recognize_body(scene_with_target_b64, "concat"))
+    assert r1.status_code == 200
+    assert r1.headers["X-Cache"] == "MISS"
+    assert r1.json()["from_cache"] is False
+
+    r2 = c.post("/v1/recognize", json=_recognize_body(scene_with_target_b64, "concat"))
+    assert r2.status_code == 200
+    assert r2.headers["X-Cache"] == "HIT"
+    assert r2.json()["from_cache"] is True
+    # merged 进了缓存,命中后仍正确且与首次一致。
+    assert r2.json()["merged"] == r1.json()["merged"]
+    assert r2.json()["merged"]
+
+    # 同图但 merge=dedup → 缓存键不同 → MISS,不串味。
+    r3 = c.post("/v1/recognize", json=_recognize_body(scene_with_target_b64, "dedup"))
+    assert r3.status_code == 200
+    assert r3.headers["X-Cache"] == "MISS"
+    assert r3.json()["from_cache"] is False
+    assert r3.json()["merged"] is not None
+
+
 def test_metrics_endpoint_after_match(client, scene_with_target_b64):
     """真实端到端:先发一次模板识别,再拉 /metrics,断言计数已记录(真实数据)。"""
     client.post(

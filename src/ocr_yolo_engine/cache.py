@@ -16,7 +16,7 @@ from typing import Protocol
 
 import numpy as np
 
-from ocr_yolo_engine.schemas import Method, MethodResult, RecognizeRequest
+from ocr_yolo_engine.schemas import Detection, Method, MethodResult, RecognizeRequest
 
 
 @dataclass
@@ -25,6 +25,8 @@ class CachedResult:
 
     method_results: dict[Method, MethodResult]
     image_size: list[int]
+    # 合并后的统一检测列表(merge!=none 时);随 method_results 一并缓存,避免重算。
+    merged: list[Detection] | None = None
 
 
 class ResultCache(Protocol):
@@ -96,8 +98,8 @@ def compute_cache_key(image_bgr: np.ndarray, req: RecognizeRequest) -> str:
     """以解码后的图像数组字节 + 规范化请求参数算 sha256,作为稳定缓存键。
 
     规范化:methods 排序、model、templates 排序、有效 conf_threshold(None 原样)、
-    roi 的 model_dump、merge 字段(若 schema 含)。cache/debug 不参与键计算
-    (它们决定是否读写缓存,而非结果本身)。
+    roi 的 model_dump、merge 策略。cache/debug 不参与键计算
+    (它们决定是否读写缓存,而非结果本身)。merge 改变输出,必须入键以免串味。
     """
     hasher = hashlib.sha256()
     hasher.update(image_bgr.tobytes())
@@ -108,11 +110,9 @@ def compute_cache_key(image_bgr: np.ndarray, req: RecognizeRequest) -> str:
         "templates": sorted(req.templates) if req.templates else None,
         "conf_threshold": req.conf_threshold,
         "roi": req.roi.model_dump() if req.roi is not None else None,
+        # merge 影响 merged 输出,纳入键;不同 merge 不复用同一条目,避免串味。
+        "merge": req.merge,
     }
-    # merge 字段若 schema 演进时新增,纳入键;当前 schema 无则跳过。
-    merge = getattr(req, "merge", None)
-    if merge is not None:
-        params["merge"] = merge.model_dump() if hasattr(merge, "model_dump") else merge
 
     canonical = json.dumps(params, sort_keys=True, ensure_ascii=False, default=str)
     hasher.update(canonical.encode("utf-8"))

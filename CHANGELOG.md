@@ -35,6 +35,7 @@
 - 新增 **Prometheus 指标端点** `GET /metrics`:各识别方法的请求数与推理累计耗时(零额外依赖,文本暴露格式)。
 - **Docker 改用 uv**:CPU/GPU 镜像由 `pip install` 改为 `uv sync --frozen --no-dev --extra ocr --extra yolo`,按 `uv.lock` 安装,与开发/CI 同工具链、版本可复现、构建更快。
 - 新增**可插拔结果缓存(默认关闭)**:`OYE_RESULT_CACHE_SIZE=0` 时核心管线零开销、行为与现状一致;开启后对相同图 + 参数的请求命中缓存直接返回。支持请求级三模式 `cache`(`auto`/`refresh`/`off`)、`from_cache` 字段与 `X-Cache` 响应头(HIT/MISS/BYPASS)、TTL 过期与 LRU 淘汰;模型 `unload`/`reload` 自动清空缓存;新增指标 `oye_cache_events_total{event="hit|miss"}`。设计见 ADR 0003。
+- 新增 **`/recognize` 可插拔多方法合并策略**:`RecognizeRequest.merge`(`none`/`priority`/`dedup`/`concat`,默认 `none` 即现状,`merged=None`)、`RecognizeResponse.merged` 统一检测列表。`priority` 按 `methods` 顺序命中即停(省后续算力)、`dedup` 跨方法 NMS 去重(IoU ≥ 0.5)、`concat` 按置信度降序汇总;仅 `/recognize` 生效,单方法端点不受影响。与结果缓存兼容(缓存键含 `merge`、`merged` 进缓存,不同策略不串味)。设计见 ADR 0004。
 
 ### 变更
 - 文档同步:`项目说明`/`使用文档`/`部署文档`/`开发说明`/`设计与决策` 更新真实数据测试、新端点(`/metrics`、模型热管理)、debug 标注图、Docker(uv)等;去除过时的 fake/计数描述。

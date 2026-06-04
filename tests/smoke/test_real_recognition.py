@@ -112,6 +112,53 @@ def test_reload_real_model_http():
     assert "yolov8n" in registry.loaded_names()
 
 
+def test_recognize_multi_method_merge_concat_real():
+    """真实多方法 /v1/recognize:场景含文字 + 黑块,template+ocr,merge=concat。
+
+    断言 merged 同时含模板与 OCR 的检测,且按置信度降序有序。
+    """
+    pytest.importorskip("paddleocr")
+
+    import cv2
+
+    from tests.conftest import TEMPLATE_NAME, make_client
+    from tests.fixtures.factory import make_scene_with_patch, scene_b64
+
+    # 真实场景:白底 + 文字 "HELLO"(供 OCR)+ 12x12 黑块(供模板匹配)。
+    img = make_scene_with_patch(400, 160, (300, 120, 12, 12))
+    cv2.putText(img, "HELLO", (20, 90), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 0), 4)
+
+    client = make_client()
+    try:
+        r = client.post(
+            "/v1/recognize",
+            json={
+                "image": {"base64": scene_b64(img)},
+                "methods": ["template", "ocr"],
+                "templates": [TEMPLATE_NAME],
+                "merge": "concat",
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 - 模型下载/联网失败时优雅跳过
+        pytest.skip(f"无法获取 PaddleOCR 模型:{exc}")
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    tmpl = body["method_results"]["template"]["detections"]
+    ocr = body["method_results"]["ocr"]["detections"]
+    assert tmpl, "应检出模板黑块"
+    assert ocr, "应识别到文字"
+    merged = body["merged"]
+    assert merged is not None
+    # 合并后应同时包含模板与 OCR 来源的检测。
+    sources = {d["source"] for d in merged}
+    assert {"template", "ocr"} <= sources
+    assert len(merged) == len(tmpl) + len(ocr)
+    # 按置信度降序有序。
+    confs = [d["confidence"] for d in merged]
+    assert confs == sorted(confs, reverse=True)
+
+
 def test_template_real_http_e2e():
     """真实 TestClient + 真实模板:无重依赖,完整 HTTP 跑通模板匹配。"""
     from tests.conftest import PATCH_CENTER, SCENE_H, SCENE_W, TEMPLATE_NAME, make_client
