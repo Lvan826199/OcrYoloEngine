@@ -50,6 +50,9 @@ class YoloRecognizer:
 
 def load_yolo_model(spec: ModelSpec) -> Any:
     """生产用 loader_fn:懒加载 ultralytics 模型。注入到 ModelRegistry。"""
-    from ultralytics import YOLO  # 懒加载,避免顶层导入 torch
+    # 懒加载,避免顶层导入 torch;ultralytics 未显式 re-export YOLO。
+    # 装了 ultralytics 的环境会报 attr-defined,未装的环境则该 ignore 多余,
+    # 故同时容忍 unused-ignore,使两类 mypy 环境均通过。
+    from ultralytics import YOLO  # type: ignore[attr-defined, unused-ignore]
 
     return YOLO(spec.path)

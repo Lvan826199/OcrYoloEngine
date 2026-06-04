@@ -5,11 +5,13 @@ from __future__ import annotations
 import base64
 import time
 
+import cv2
 import numpy as np
 
-from ocr_yolo_engine.errors import EngineError
+from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.image.loader import load_from_base64, load_from_path
 from ocr_yolo_engine.observability.logging import current_request_id
+from ocr_yolo_engine.preprocessing.annotate import draw_detections
 from ocr_yolo_engine.preprocessing.pipeline import (
     crop_roi,
     enforce_limits,
@@ -18,6 +20,7 @@ from ocr_yolo_engine.preprocessing.pipeline import (
 )
 from ocr_yolo_engine.recognizers.base import InferContext, RawDetection
 from ocr_yolo_engine.schemas import (
+    Detection,
     Method,
     MethodResult,
     RecognizeRequest,
@@ -103,9 +106,23 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
             elapsed_ms=elapsed_ms,
         )
 
+    debug_image = _build_debug_image(bgr, method_results) if req.debug else None
+
     return RecognizeResponse(
         request_id=request_id,
         image_size=[full_w, full_h],
         method_results=method_results,
-        debug_image=None,
+        debug_image=debug_image,
     )
+
+
+def _build_debug_image(bgr: np.ndarray, method_results: dict[Method, MethodResult]) -> str:
+    """汇总所有方法的检测框,在原始全图 BGR 副本上画框,返回 base64 编码的 PNG。"""
+    detections: list[Detection] = []
+    for result in method_results.values():
+        detections.extend(result.detections)
+    annotated = draw_detections(bgr, detections)
+    ok, buf = cv2.imencode(".png", annotated)
+    if not ok:
+        raise EngineError(ErrorCode.INTERNAL, "调试标注图 PNG 编码失败")
+    return base64.b64encode(buf.tobytes()).decode()
