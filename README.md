@@ -80,7 +80,7 @@ https://github.com/othneildrew/Best-README-Template
 
 ## 快速开始
 
-> 完整版见 [快速开始指南](docs/guide/quickstart.md);从零开始、对命令行不熟看 [小白操作文档](docs/guide/beginner-guide.md)。
+> 完整版见 [快速开始](docs/快速开始.md)(含「从零开始(小白手把手)」一节,对命令行不熟也能跟着跑通)。
 
 ### 环境要求
 
@@ -121,7 +121,7 @@ curl -s http://localhost:8000/v1/ocr \
 
 主要接口:`/v1/ocr`(文字)、`/v1/detect`(YOLO)、`/v1/match`(模板)、`/v1/recognize`(多方法合并)、`/v1/recognize/upload`(上传)、`/v1/models`、`/v1/templates`、`/health`、`/ready`。命令行调试:`uv run ocr-yolo infer screenshot.png --methods ocr`。
 
-> 全部端点、字段、错误码、配置项见 **[使用文档](docs/guide/usage.md)**。
+> 全部端点、字段、错误码、配置项见 **[使用文档](docs/使用文档.md)**。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -133,7 +133,7 @@ curl -s http://localhost:8000/v1/ocr \
 - Docker:`docker build -f docker/Dockerfile.cpu -t ocr-yolo:cpu .`(GPU 用 `Dockerfile.gpu`),模型/模板/配置以 volume 挂载。
 - 生产建议开启 API Key(`OYE_API_KEYS`)、限制本地路径白名单(`OYE_ALLOWED_PATH_ROOTS`)。
 
-> 完整部署、调优与安全见 **[部署文档](docs/guide/deployment.md)**。
+> 完整部署、调优与安全见 **[部署文档](docs/部署文档.md)**。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -141,14 +141,14 @@ curl -s http://localhost:8000/v1/ocr \
 
 ## 开发文档
 
-项目的设计与实现细节由以下文档持续维护，参与开发前请先阅读：
+项目的设计与实现细节由 `docs/` 下 6 个文档持续维护，参与开发前请先阅读：
 
-- 🗃️ [文档中心（分类索引）](docs/README.md) —— 所有文档的统一入口。
-- 🚀 [使用指南](docs/guide/) —— 快速开始 / 小白操作 / 使用 / 部署 / 项目详细文档。
-- 📌 [开发主线索引与进度](docs/DEVELOPMENT.md) —— **跨会话接手的第一入口**：文档地图、任务进度表、关键约定速查。
-- 📐 [设计文档（spec）](docs/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
-- 🗂️ [实现计划](docs/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
-- 🧭 [架构决策记录（ADR）](docs/adr/) —— 重要技术取舍的逐条记录。
+- 📖 [项目说明](docs/项目说明.md) —— 项目流程、核心技术、架构;顶部含全部文档导航。
+- 🚀 [快速开始](docs/快速开始.md) —— 5 分钟跑起来 + 从零开始的小白手把手。
+- 📚 [使用文档](docs/使用文档.md) —— 全部 API 端点、字段、CLI、配置、错误码。
+- 🚢 [部署文档](docs/部署文档.md) —— 本地 / Docker(CPU/GPU)/ 调优 / 安全。
+- 📐 [设计与决策](docs/设计与决策.md) —— 需求/范围/架构的权威来源 + 架构决策记录(ADR)。
+- 📌 [开发说明](docs/开发说明.md) —— **跨会话接手的第一入口**：文档地图、任务清单/进度表、关键约定速查。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -175,7 +175,7 @@ curl -s http://localhost:8000/v1/ocr \
 
 ## 贡献
 
-欢迎贡献！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解流程，并遵守 [行为准则](CODE_OF_CONDUCT.md)。变更记录见 [CHANGELOG.md](CHANGELOG.md)，重要架构决策记录见 [docs/adr](docs/adr/)。
+欢迎贡献！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解流程，并遵守 [行为准则](CODE_OF_CONDUCT.md)。变更记录见 [CHANGELOG.md](CHANGELOG.md)，重要架构决策记录见 [设计与决策](docs/设计与决策.md)。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 

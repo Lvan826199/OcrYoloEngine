@@ -13,26 +13,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像与质量门禁,81 个测试全绿。后续工作见 `docs/DEVELOPMENT.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
+首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像与质量门禁,81 个测试全绿。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
 
 ## 文档引用规则（强制）
 
-本仓库的开发主线由以下文档承载，**每个会话开始前先读 `docs/DEVELOPMENT.md` 掌握进度与约定**：
+本仓库的文档已收敛为 `docs/` 下 6 个扁平的中文文件，**每个会话开始前先读 `docs/开发说明.md` 掌握进度与约定**：
 
 | 文档 | 作用 |
 |------|------|
-| `docs/README.md` | **文档中心索引**，按分类归档导航 |
-| `docs/DEVELOPMENT.md` | **开发主线索引 + 进度表 + 约定速查**，跨会话接手的第一入口 |
-| `docs/specs/2026-06-03-recognition-service-design.md` | 设计 spec：需求与架构的权威来源 |
-| `docs/plans/2026-06-03-recognition-service.md` | 实现计划：逐任务 TDD 步骤与完整代码 |
-| `docs/adr/` | 架构决策记录（MADR），重要技术取舍逐条记录 |
+| `docs/项目说明.md` | **项目说明 + 文档导航**：流程/核心技术/架构，顶部含 6 文件导航表 |
+| `docs/快速开始.md` | 快速开始(5 分钟)+ 从零开始的小白手把手 |
+| `docs/使用文档.md` | 使用指南：API / CLI / 配置 / 错误码 |
+| `docs/部署文档.md` | 部署指南：本地 / Docker / 调优 / 安全 |
+| `docs/设计与决策.md` | 设计 spec(需求与架构的权威来源)+ 架构决策记录(ADR/MADR) |
+| `docs/开发说明.md` | **开发主线索引 + 进度表 + 任务清单 + 约定速查**，跨会话接手的第一入口 |
 
 规则：
 
-- **每完成一个任务**，回 `docs/DEVELOPMENT.md` 更新「进度表」（标 ✅ + 完成日期）。
-- 改动 spec / plan 后，必须同步 `docs/DEVELOPMENT.md` 的进度与约定。
+- **每完成一个任务**，回 `docs/开发说明.md` 更新「进度表」（标 ✅ + 完成日期）。
+- 改动设计 / 架构后，必须同步 `docs/开发说明.md` 的进度与约定。
 - 新增或调整工作规则时，同步进本文件（CLAUDE.md）与 `README.md`。
-- 有用户可见变更时更新 `CHANGELOG.md`；涉及架构取舍时在 `docs/adr/` 新增一条。
+- 有用户可见变更时更新 `CHANGELOG.md`；涉及架构取舍时在 `docs/设计与决策.md` 的「架构决策记录」一节新增一条。
 
 ## 报错必修（强制）
 
@@ -115,4 +116,4 @@ uv run ocr-yolo infer img.png --methods ocr   # 本地单图推理
 
 ## 架构
 
-分层单体:`service`(FastAPI/v1)→ `concurrency`(有界池+模型锁)→ `preprocessing`(通道统一/ROI 回映射)→ `recognizers`(ocr/yolo/template 统一抽象)→ `models.registry`/`templates.store`(资产管理)。识别器只吃预处理图、吐基于输入图坐标的 `RawDetection`,坐标回映射与归一化统一在 `preprocessing.finalize_detections`。详见 `docs/specs/2026-06-03-recognition-service-design.md` 与 `docs/plans/2026-06-03-recognition-service.md`。
+分层单体:`service`(FastAPI/v1)→ `concurrency`(有界池+模型锁)→ `preprocessing`(通道统一/ROI 回映射)→ `recognizers`(ocr/yolo/template 统一抽象)→ `models.registry`/`templates.store`(资产管理)。识别器只吃预处理图、吐基于输入图坐标的 `RawDetection`,坐标回映射与归一化统一在 `preprocessing.finalize_detections`。详见 `docs/设计与决策.md` 与 `docs/开发说明.md`。
