@@ -1,0 +1,167 @@
+# 部署文档
+
+> 把服务部署到本地或服务器。接口用法见 [使用文档](usage.md)。
+
+---
+
+## 1. 部署形态选择
+
+| 方式 | 适合 | 说明 |
+|---|---|---|
+| 本地直跑(uv) | 开发、调试、同机部署 | 最简单,见 §2 |
+| Docker(CPU) | 服务器、无 GPU | 镜像内固化依赖,见 §3 |
+| Docker(GPU) | 有 NVIDIA GPU、追求吞吐 | 需 nvidia-container-toolkit,见 §3 |
+
+模型权重、模板图**不打进镜像**,运行时用 volume 挂载,方便更新。
+
+---
+
+## 2. 本地 / 服务器直跑
+
+```bash
+git clone https://gitee.com/xiaozai-van-liu/OcrYoloEngine.git
+cd OcrYoloEngine
+uv sync --extra yolo --extra ocr          # 生产装全量识别能力
+uv run ocr-yolo serve --host 0.0.0.0 --port 8000
+```
+
+后台常驻可用 systemd / supervisor / `nohup`。示例 systemd 单元 `/etc/systemd/system/ocr-yolo.service`:
+
+```ini
+[Unit]
+Description=OcrYoloEngine
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/OcrYoloEngine
+Environment=OYE_DEVICE=cpu
+Environment=OYE_API_KEYS=["prod-key-1"]
+ExecStart=/home/USER/.local/bin/uv run ocr-yolo serve --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now ocr-yolo
+```
+
+---
+
+## 3. Docker 部署
+
+仓库 `docker/` 下已提供两套 Dockerfile。
+
+### 3.1 CPU
+
+```bash
+# 在仓库根目录构建
+docker build -f docker/Dockerfile.cpu -t ocr-yolo:cpu .
+
+# 运行:挂载模型/模板/配置,映射端口
+docker run -d --name ocr-yolo -p 8000:8000 \
+  -e OYE_DEVICE=cpu \
+  -e OYE_API_KEYS='["prod-key-1"]' \
+  -v $(pwd)/models_store:/app/models_store \
+  -v $(pwd)/templates_store:/app/templates_store \
+  -v $(pwd)/configs:/app/configs \
+  ocr-yolo:cpu
+```
+
+### 3.2 GPU
+
+前置:宿主装好 NVIDIA 驱动 + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
+
+```bash
+docker build -f docker/Dockerfile.gpu -t ocr-yolo:gpu .
+
+docker run -d --name ocr-yolo --gpus all -p 8000:8000 \
+  -e OYE_DEVICE=cuda \
+  -v $(pwd)/models_store:/app/models_store \
+  -v $(pwd)/templates_store:/app/templates_store \
+  -v $(pwd)/configs:/app/configs \
+  ocr-yolo:gpu
+```
+
+> 镜像构建会 `pip install ".[ocr,yolo]"`,首次较慢;CPU 与 GPU 的 torch/paddle 包不同,务必用对应 Dockerfile。
+
+### 3.3 docker compose(可选)
+
+```yaml
+services:
+  ocr-yolo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cpu
+    ports: ["8000:8000"]
+    environment:
+      OYE_DEVICE: cpu
+      OYE_MAX_WORKERS: "4"
+    volumes:
+      - ./models_store:/app/models_store
+      - ./templates_store:/app/templates_store
+      - ./configs:/app/configs
+    restart: always
+```
+
+---
+
+## 4. 配置(环境变量)
+
+全部用 `OYE_` 前缀的环境变量,或项目根 `.env` 文件。完整清单见 [使用文档 §8](usage.md#8-配置环境变量-oye_)。部署最常用:
+
+| 变量 | 建议 |
+|---|---|
+| `OYE_DEVICE` | 服务器无 GPU 用 `cpu`;有 GPU 用 `cuda` 或 `auto` |
+| `OYE_API_KEYS` | **生产务必设**,如 `["k1","k2"]`,开启鉴权 |
+| `OYE_ALLOWED_PATH_ROOTS` | 若用本地路径传图,设白名单,如 `["/data/shots"]` |
+| `OYE_MAX_WORKERS` | 并发推理线程数,按 CPU 核 / GPU 显存调 |
+| `OYE_MAX_QUEUE` | 排队上限,超出返回 503 背压,防雪崩 |
+| `OYE_REQUEST_TIMEOUT_S` | 单请求超时,超时 504 |
+| `OYE_MODEL_CACHE_SIZE` | 同时常驻的模型数,显存紧张就调小 |
+
+---
+
+## 5. 健康检查与就绪探针
+
+- `GET /health`:存活探针(进程活着即 200)。
+- `GET /ready`:就绪探针,返回已登记模型列表。
+
+Kubernetes 示例:
+
+```yaml
+livenessProbe:
+  httpGet: { path: /health, port: 8000 }
+  initialDelaySeconds: 10
+readinessProbe:
+  httpGet: { path: /ready, port: 8000 }
+  initialDelaySeconds: 15
+```
+
+---
+
+## 6. 性能与容量调优
+
+- **CPU 部署**:`OYE_MAX_WORKERS` 设为 CPU 物理核数附近;OCR/YOLO 单次推理几十~几百 ms,吞吐主要受核数限制。
+- **GPU 部署**:同一模型推理由"每模型锁"串行化(避免线程不安全),提升吞吐靠减少模型切换、合理 `OYE_MODEL_CACHE_SIZE`,必要时多副本 + 负载均衡。
+- **背压**:`OYE_MAX_QUEUE` 控制排队深度。过载时服务直接 `503 + Retry-After`,调用方应据此重试,而不是无限等待。
+- **输入上限**:`OYE_MAX_IMAGE_BYTES` / `OYE_MAX_IMAGE_PIXELS` 防超大图打爆内存,按业务图尺寸设置。
+- **多副本**:服务本身无状态(模型/模板来自挂载目录),可水平扩多实例,前置 Nginx / 负载均衡。
+
+---
+
+## 7. 安全建议
+
+- 生产**开启 API Key**(`OYE_API_KEYS`),不要裸奔。
+- 用本地路径传图时,**务必**用 `OYE_ALLOWED_PATH_ROOTS` 限定可读目录(防路径穿越读到任意文件)。
+- 不要把服务直接暴露公网;经反向代理 + HTTPS + 鉴权。
+- 模型权重(`*.pt` 等)已被 `.gitignore` 忽略,不入库;通过挂载或镜像构建分发。
+
+---
+
+## 8. 升级与回滚
+
+- 代码升级:`git pull` → `uv sync --extra yolo --extra ocr` → 重启;Docker 则重建镜像。
+- 换模型**不必重启**:更新 `models_store/` 权重并在 `configs/models.yaml` 改版本,可通过注册表的卸载/重载入口刷新(后续若开放对应管理接口)。当前最简单稳妥方式是重启服务。
+- 依赖版本由 `uv.lock` 锁定,保证多机一致、可复现。

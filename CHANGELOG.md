@@ -24,5 +24,7 @@
   - 测试:单元 + HTTP 契约 + golden/smoke 约定,81 个测试全绿。
 - 架构决策记录 ADR 0002:模板匹配采用归一化 SAD 置信度。
 - 移除全部第三方 Claude Code 插件引用(保留 claude-hud),文档去除插件相关命名。
+- 新增**使用指南** `docs/guide/`:快速开始、小白操作文档、使用文档(API/CLI/配置/错误码)、部署文档(本地/Docker/调优)、项目详细文档(流程/核心技术/架构);完善 README 的快速开始/使用方法/部署。
+- `uv.lock` 纳入版本管理(锁定依赖版本)。
 
 [未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/master...HEAD

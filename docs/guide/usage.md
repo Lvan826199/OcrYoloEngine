@@ -1,0 +1,271 @@
+# 使用文档（API · CLI · 配置 · 错误码）
+
+> 完整接口参考。先跑起来 → [快速开始](quickstart.md);理解原理 → [项目详细文档](overview.md)。
+
+服务默认监听 `http://0.0.0.0:8000`。交互式接口文档(FastAPI 自带)在服务启动后访问:`http://localhost:8000/docs`。
+
+---
+
+## 1. 鉴权
+
+- 当环境变量 `OYE_API_KEYS` **为空**(默认)→ **不鉴权**,任何人可调用(本地开发友好)。
+- 当 `OYE_API_KEYS` 配了一个或多个 key → 所有 `/v1/*` 接口都要带请求头:
+
+```
+X-API-Key: <你的key>
+```
+
+缺失或错误返回 `401`。`/health`、`/ready` 不需要鉴权。
+
+---
+
+## 2. 图片怎么传(三选一)
+
+| 方式 | 用在哪 | 说明 |
+|---|---|---|
+| `base64` | JSON 接口的 `image.base64` | 图片字节的 base64,支持 `data:image/png;base64,...` 前缀 |
+| `path` | JSON 接口的 `image.path` | **服务端本地路径**,必须落在 `OYE_ALLOWED_PATH_ROOTS` 白名单内(同机部署时最省事,免传输) |
+| 文件上传 | `POST /v1/recognize/upload` | multipart 表单,字段名 `file` |
+
+JSON 接口里 `image` 必须**且只能**提供 `base64` 或 `path` 之一。
+
+---
+
+## 3. 接口一览
+
+| 方法 | 路径 | 作用 | 请求体类型 |
+|---|---|---|---|
+| POST | `/v1/ocr` | 只跑 OCR 文字识别 | `ImageInput` |
+| POST | `/v1/detect` | 只跑 YOLO 检测 | `RecognizeRequest`(需 `model`) |
+| POST | `/v1/match` | 只跑模板匹配 | `RecognizeRequest`(需 `templates`) |
+| POST | `/v1/recognize` | 一次跑多种(合并) | `RecognizeRequest` |
+| POST | `/v1/recognize/upload` | 文件上传版 | multipart 表单 |
+| GET | `/v1/models` | 列出已登记模型及版本 | — |
+| GET | `/v1/templates` | 列出已登记模板及版本 | — |
+| GET | `/health` | 存活探针 | — |
+| GET | `/ready` | 就绪探针(+已配置模型) | — |
+
+> 注意:`/v1/ocr` 的请求体直接就是图片对象 `{"base64": "..."}`;而 `/v1/detect`、`/v1/match`、`/v1/recognize` 的请求体是完整的 `RecognizeRequest`(图片在 `image` 字段里)。
+
+---
+
+## 4. 请求字段:RecognizeRequest
+
+```jsonc
+{
+  "image": { "base64": "..." },   // 或 { "path": "/allowed/root/a.png" }
+  "methods": ["yolo"],            // ["ocr"|"yolo"|"template"],可多选
+  "model": "game_a",              // methods 含 yolo 时必填:用哪个模型
+  "templates": ["settings_icon"], // methods 含 template 时必填:用哪些模板
+  "conf_threshold": 0.4,          // 可选,0~1,覆盖默认阈值
+  "roi": { "x": 100, "y": 200, "w": 300, "h": 400 }, // 可选,只在此区域识别
+  "debug": false                  // 预留,暂不返回标注图
+}
+```
+
+- `methods` 含 `yolo` 却没给 `model`,或含 `template` 却没给 `templates` → `422`(请求格式错误)。
+- `roi`:只在图片的该矩形区域内识别;返回坐标会**自动加回偏移**,仍是相对**全图**的坐标。
+
+---
+
+## 5. 响应字段:RecognizeResponse
+
+```jsonc
+{
+  "request_id": "9f2c...",          // 本次请求 id,日志里可追踪
+  "image_size": [1080, 1920],       // [宽, 高],原图像素
+  "method_results": {
+    "yolo": {
+      "detections": [
+        {
+          "source": "yolo",            // 来自哪种方法
+          "label": "boss",             // YOLO 类别 / 模板名;OCR 为 null
+          "text": null,                // OCR 识别的文字;其余为 null
+          "confidence": 0.93,          // 置信度 / 相似度,0~1
+          "bbox": [120, 340, 260, 520],      // [x1,y1,x2,y2] 全图原始像素
+          "center": [190, 430],             // [cx,cy] 全图原始像素
+          "bbox_norm": [0.111, 0.177, 0.240, 0.270], // 归一化 0~1
+          "center_norm": [0.175, 0.223]              // 归一化中心点
+        }
+      ],
+      "model_version": "v1",          // 用到的模型版本(template 方法此处为 null)
+      "template_versions": null,      // template 方法时为 {模板名: 版本}
+      "elapsed_ms": 18.4              // 该方法耗时
+    }
+  },
+  "debug_image": null
+}
+```
+
+**坐标怎么用**:`bbox = [x1, y1, x2, y2]` 是目标左上角和右下角的像素坐标;`center = [cx, cy]` 是中心点——自动化脚本通常直接点 `center`。`*_norm` 是除以图宽/高后的 0~1 值,跨分辨率时更稳。
+
+**成功但没识别到** → 仍是 `200`,对应方法的 `detections` 为 `[]`(空数组),**这不是错误**。
+
+---
+
+## 6. 调用示例
+
+### 6.1 OCR(curl + base64)
+
+```bash
+# 把图片转 base64 塞进请求
+B64=$(base64 -w0 screenshot.png)
+curl -s http://localhost:8000/v1/ocr \
+  -H "Content-Type: application/json" \
+  -d "{\"base64\": \"$B64\"}"
+```
+
+### 6.2 YOLO 检测(指定模型 + 阈值)
+
+```bash
+curl -s http://localhost:8000/v1/detect \
+  -H "Content-Type: application/json" \
+  -d '{"image": {"path": "/data/shots/a.png"}, "methods": ["yolo"], "model": "game_a", "conf_threshold": 0.5}'
+```
+
+### 6.3 模板匹配
+
+```bash
+curl -s http://localhost:8000/v1/match \
+  -H "Content-Type: application/json" \
+  -d '{"image": {"base64": "..."}, "methods": ["template"], "templates": ["settings_icon"]}'
+```
+
+### 6.4 一次跑多种(合并接口)
+
+```bash
+curl -s http://localhost:8000/v1/recognize \
+  -H "Content-Type: application/json" \
+  -d '{"image": {"base64": "..."}, "methods": ["ocr", "yolo"], "model": "game_a"}'
+# 返回的 method_results 里会同时有 "ocr" 和 "yolo" 两块结果
+```
+
+### 6.5 文件上传
+
+```bash
+curl -s http://localhost:8000/v1/recognize/upload \
+  -F "file=@screenshot.png" \
+  -F "methods=ocr,template" \
+  -F "templates=settings_icon"
+```
+
+### 6.6 带鉴权
+
+```bash
+curl -s http://localhost:8000/v1/ocr \
+  -H "X-API-Key: my-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"base64": "..."}'
+```
+
+### 6.7 Python 调用
+
+```python
+import base64, requests
+
+with open("screenshot.png", "rb") as f:
+    b64 = base64.b64encode(f.read()).decode()
+
+resp = requests.post(
+    "http://localhost:8000/v1/recognize",
+    json={"image": {"base64": b64}, "methods": ["ocr", "yolo"], "model": "game_a"},
+    headers={"X-API-Key": "my-secret-key"},  # 未开鉴权可省略
+)
+data = resp.json()
+for det in data["method_results"].get("yolo", {}).get("detections", []):
+    cx, cy = det["center"]
+    print(f"{det['label']} 置信度 {det['confidence']:.2f} → 点击 ({cx}, {cy})")
+```
+
+---
+
+## 7. CLI
+
+```bash
+# 启动服务
+uv run ocr-yolo serve --host 0.0.0.0 --port 8000
+
+# 本地单图推理(调试用,直接打印 JSON 结果)
+uv run ocr-yolo infer screenshot.png --methods ocr
+uv run ocr-yolo infer a.png --methods yolo --model game_a --conf 0.5
+uv run ocr-yolo infer a.png --methods template --templates settings_icon
+```
+
+`infer` 会自动把该图片所在目录加入路径白名单,免去手动配置。`--help` 不会触发 torch/paddle 加载。
+
+---
+
+## 8. 配置(环境变量 `OYE_*`)
+
+可直接设环境变量,或在项目根放 `.env` 文件(`KEY=VALUE` 每行一条)。
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `OYE_DEVICE` | `auto` | `auto`/`cpu`/`cuda`;auto 检测到 GPU 用 GPU 否则 CPU |
+| `OYE_DEFAULT_CONF_THRESHOLD` | `0.25` | YOLO 默认置信度阈值(请求可覆盖) |
+| `OYE_MODELS_CONFIG_PATH` | `configs/models.yaml` | 模型注册表路径 |
+| `OYE_TEMPLATES_CONFIG_PATH` | `configs/templates.yaml` | 模板库路径 |
+| `OYE_MODEL_CACHE_SIZE` | `3` | 模型 LRU 缓存上限 |
+| `OYE_MAX_WORKERS` | `4` | 推理工作池线程数 |
+| `OYE_MAX_QUEUE` | `32` | 排队上限,超出返回 503 |
+| `OYE_REQUEST_TIMEOUT_S` | `30` | 单请求超时(秒),超时 504 |
+| `OYE_MAX_IMAGE_BYTES` | `10485760`(10MB) | 输入图片字节上限 |
+| `OYE_MAX_IMAGE_PIXELS` | `16777216`(4096²) | 输入分辨率上限 |
+| `OYE_ALLOWED_PATH_ROOTS` | `[]` | 本地路径输入白名单根目录(JSON 数组),如 `["/data/shots"]` |
+| `OYE_API_KEYS` | `[]` | 允许的 API Key(JSON 数组),空则关闭鉴权 |
+| `OYE_WARMUP` | `true` | 启动时预热 |
+
+> 列表/布尔类用 JSON 写法:`OYE_API_KEYS='["k1","k2"]'`、`OYE_WARMUP=false`。
+
+### 8.1 模型登记 `configs/models.yaml`
+
+```yaml
+models:
+  game_a:                          # 模型名(请求里的 model 字段用这个)
+    path: models_store/game_a.pt   # 权重路径(权重不入库,自行放置)
+    version: v1
+    classes:                       # 类别索引 → 名称(必须与训练时一致)
+      0: boss
+      1: coin
+```
+
+### 8.2 模板登记 `configs/templates.yaml`
+
+```yaml
+templates:
+  settings_icon:                       # 模板名(请求里的 templates 用这个)
+    path: templates_store/settings.png # 模板图路径
+    version: v1
+    params:
+      threshold: 0.85                  # 该模板的匹配阈值(可选)
+```
+
+---
+
+## 9. 错误码
+
+出错时返回统一结构:
+
+```json
+{ "request_id": "...", "error_code": "INVALID_IMAGE", "message": "无法解码为图片", "details": {} }
+```
+
+| HTTP | error_code | 含义 |
+|---|---|---|
+| 400 | `INVALID_IMAGE` | 图片无法解码 / base64 非法 |
+| 413 | `IMAGE_TOO_LARGE` | 超过字节或分辨率上限 |
+| 403 | `PATH_NOT_ALLOWED` | 本地路径不在白名单(防穿越) |
+| 404 | `MODEL_NOT_FOUND` | 指定的模型未登记 |
+| 404 | `TEMPLATE_NOT_FOUND` | 指定的模板未登记 |
+| 503 | `OVERLOADED` | 队列已满,带 `Retry-After` 头,请稍后重试 |
+| 504 | `TIMEOUT` | 单请求推理超时 |
+| 500 | `INTERNAL` | 服务内部错误 |
+| 422 | (FastAPI 校验) | 请求字段不合法(如 yolo 缺 model) |
+
+---
+
+## 10. 常见问题
+
+- **返回 `detections` 是空的?** 说明该方法没找到达到阈值的目标,属正常 `200`。可调低 `conf_threshold` 再试。
+- **想同机免传图片?** 把截图目录加入 `OYE_ALLOWED_PATH_ROOTS`,请求用 `{"path": "..."}`。
+- **YOLO/OCR 报缺包?** 识别器是重依赖懒加载,需要先装 extras:`uv sync --extra yolo --extra ocr`(见 [部署文档](deployment.md))。

@@ -39,10 +39,11 @@ https://github.com/othneildrew/Best-README-Template
     <li><a href="#快速开始">快速开始</a>
       <ul>
         <li><a href="#环境要求">环境要求</a></li>
-        <li><a href="#安装">安装</a></li>
+        <li><a href="#安装与启动">安装与启动</a></li>
       </ul>
     </li>
     <li><a href="#使用方法">使用方法</a></li>
+    <li><a href="#部署">部署</a></li>
     <li><a href="#开发文档">开发文档</a></li>
     <li><a href="#路线图">路线图</a></li>
     <li><a href="#贡献">贡献</a></li>
@@ -79,31 +80,27 @@ https://github.com/othneildrew/Best-README-Template
 
 ## 快速开始
 
-按以下步骤在本地搭建项目。
+> 完整版见 [快速开始指南](docs/guide/quickstart.md);从零开始、对命令行不熟看 [小白操作文档](docs/guide/beginner-guide.md)。
 
 ### 环境要求
 
-* Python 3.x
-* （待补充）依赖清单与模型权重获取方式
+* Python ≥ 3.11
+* [uv](https://docs.astral.sh/uv/) 包管理器(`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+* 用 YOLO 需自备权重(放 `models_store/` 并在 `configs/models.yaml` 登记);OCR 首次自动下载内置模型
 
-### 安装
+### 安装与启动
 
-> 以下命令为占位示例，待项目依赖与入口脚本就绪后更新。
+```sh
+git clone https://gitee.com/xiaozai-van-liu/OcrYoloEngine.git
+cd OcrYoloEngine
 
-1. 克隆仓库
-   ```sh
-   git clone https://gitee.com/xiaozai-van-liu/OcrYoloEngine.git
-   cd OcrYoloEngine
-   ```
-2. 创建并激活虚拟环境
-   ```sh
-   python -m venv .venv
-   source .venv/bin/activate
-   ```
-3. 安装依赖
-   ```sh
-   pip install -r requirements.txt
-   ```
+uv sync                          # 基础:HTTP 服务 + 模板匹配
+uv sync --extra yolo --extra ocr # 需要 YOLO / OCR 时(会拉 torch / paddle 大包)
+
+uv run ocr-yolo serve            # 启动服务,默认 http://0.0.0.0:8000
+```
+
+健康检查:`curl http://localhost:8000/health` → `{"status":"ok"}`。交互式接口文档:`http://localhost:8000/docs`。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -111,7 +108,32 @@ https://github.com/othneildrew/Best-README-Template
 
 ## 使用方法
 
-_待补充：提供推理 / 训练的最小示例。_
+把截图(base64 / 本地路径 / 上传)发给对应接口,拿回坐标与文字。最小示例(文字识别,无需自备模型):
+
+```sh
+B64=$(base64 -w0 screenshot.png)
+curl -s http://localhost:8000/v1/ocr \
+  -H "Content-Type: application/json" \
+  -d "{\"base64\": \"$B64\"}"
+```
+
+返回 `method_results.ocr.detections` 中每项含 `text`、`confidence`、`bbox`、`center`——`center` 即可点击坐标。
+
+主要接口:`/v1/ocr`(文字)、`/v1/detect`(YOLO)、`/v1/match`(模板)、`/v1/recognize`(多方法合并)、`/v1/recognize/upload`(上传)、`/v1/models`、`/v1/templates`、`/health`、`/ready`。命令行调试:`uv run ocr-yolo infer screenshot.png --methods ocr`。
+
+> 全部端点、字段、错误码、配置项见 **[使用文档](docs/guide/usage.md)**。
+
+<p align="right">(<a href="#readme-top">回到顶部</a>)</p>
+
+---
+
+## 部署
+
+- 本地 / 服务器直跑:`uv run ocr-yolo serve --host 0.0.0.0 --port 8000`(可配 systemd 常驻)。
+- Docker:`docker build -f docker/Dockerfile.cpu -t ocr-yolo:cpu .`(GPU 用 `Dockerfile.gpu`),模型/模板/配置以 volume 挂载。
+- 生产建议开启 API Key(`OYE_API_KEYS`)、限制本地路径白名单(`OYE_ALLOWED_PATH_ROOTS`)。
+
+> 完整部署、调优与安全见 **[部署文档](docs/guide/deployment.md)**。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -121,7 +143,8 @@ _待补充：提供推理 / 训练的最小示例。_
 
 项目的设计与实现细节由以下文档持续维护，参与开发前请先阅读：
 
-- 🗃️ [文档中心（分类索引）](docs/README.md) —— 所有开发文档的统一入口。
+- 🗃️ [文档中心（分类索引）](docs/README.md) —— 所有文档的统一入口。
+- 🚀 [使用指南](docs/guide/) —— 快速开始 / 小白操作 / 使用 / 部署 / 项目详细文档。
 - 📌 [开发主线索引与进度](docs/DEVELOPMENT.md) —— **跨会话接手的第一入口**：文档地图、任务进度表、关键约定速查。
 - 📐 [设计文档（spec）](docs/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
 - 🗂️ [实现计划](docs/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
