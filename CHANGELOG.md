@@ -12,5 +12,17 @@
 - 视觉识别服务设计文档（spec）与分阶段实现计划。
 - 开发主线文档 `docs/DEVELOPMENT.md`（文档地图 + 进度表 + 约定速查）。
 - CLAUDE.md 增补「文档引用规则」与「报错必修」强制规则；README 增设「开发文档」入口。
+- 文档分类整理:`docs/specs`、`docs/plans`、`docs/adr`,并新增 `docs/README.md` 文档中心索引。
+- **视觉识别服务首版骨架(22 个任务,全 TDD)**:
+  - 工程脚手架(uv + pyproject + ruff/mypy/pytest)、集中配置 `settings`、统一错误契约 `errors`、数据模型 `schemas`。
+  - 图片加载(base64/本地路径白名单防穿越)与预处理(通道统一、输入上限、ROI 裁剪与坐标回映射)。
+  - 识别器统一抽象 + 三识别器:模板匹配(多尺度 + 归一化 SAD + NMS)、PaddleOCR、YOLO(均重依赖懒加载)。
+  - 模型注册表(懒加载 + LRU + 卸载/重载)与模板库(加载缓存 + 版本)。
+  - 并发工作池(有界池 + 每模型锁 + 背压 503 / 超时 504)、结构化日志 + request_id。
+  - FastAPI `/v1` 路由(ocr/detect/match/recognize/upload/models/templates/health/ready)、API Key 鉴权、依赖注入与可注入 fake。
+  - CLI(`serve`/`infer`)、隔离训练入口 `training/`、CPU/GPU Dockerfile、pre-commit 质量门禁。
+  - 测试:单元 + HTTP 契约 + golden/smoke 约定,81 个测试全绿。
+- 架构决策记录 ADR 0002:模板匹配采用归一化 SAD 置信度。
+- 移除全部第三方 Claude Code 插件引用(保留 claude-hud),文档去除插件相关命名。
 
 [未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/master...HEAD

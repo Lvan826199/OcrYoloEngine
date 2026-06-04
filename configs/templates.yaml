@@ -1,0 +1,8 @@
+# 模板库:名称 → 模板图路径/版本/匹配参数
+templates: {}
+  # 示例:
+  # settings_icon:
+  #   path: templates_store/settings.png
+  #   version: v1
+  #   params:
+  #     threshold: 0.85

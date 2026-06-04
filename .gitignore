@@ -20,3 +20,17 @@ env/
 .idea/
 .vscode/
 *.log
+
+# 测试/lint/类型检查缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 模型存储目录(保留占位文件,权重仍被忽略)
+models_store/*
+!models_store/.gitkeep
+templates_store/*
+!templates_store/.gitkeep
+
+# uv 锁文件（可选，视团队策略）
+# uv.lock

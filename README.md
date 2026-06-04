@@ -10,7 +10,7 @@ https://github.com/othneildrew/Best-README-Template
 <h1 align="center">OcrYoloEngine</h1>
 
 <p align="center">
-  一个基于 YOLO 目标检测 + OCR 文字识别的引擎。
+  面向自动化测试的视觉识别服务:OCR + YOLO + 模板匹配,只识别返回坐标,不执行动作。
   <br />
   <a href="#关于项目"><strong>探索文档 »</strong></a>
   <br />
@@ -55,9 +55,15 @@ https://github.com/othneildrew/Best-README-Template
 
 ## 关于项目
 
-`OcrYoloEngine` 旨在把 **YOLO 目标检测**与 **OCR 文字识别**结合到一个统一的引擎中：先用 YOLO 定位图像中的文字/目标区域，再对这些区域做 OCR 识别，输出结构化结果。
+`OcrYoloEngine` 是面向**自动化测试**的视觉识别 HTTP 服务。其他自动化脚本在执行时截图,把图片发给本服务,本服务用三种互补手段识别并返回结果(坐标、文字、置信度),**只识别、不执行点击等动作**:
 
-> ⚠️ 项目当前处于早期阶段，核心代码仍在搭建中。本 README 的结构已就位，功能描述将随开发推进逐步充实。
+- **OCR**(PaddleOCR):文字识别与定位。
+- **YOLO**(ultralytics):目标检测/分类,返回坐标 + 置信度,支持按游戏训练专用模型。
+- **模板匹配**(OpenCV):多尺度模板/图标匹配。
+
+三种方法统一接口、统一结果结构,调用方拿到全字段后自行筛选。典型场景:手机 App 文字定位、Web 元素定位、手机游戏复杂图像定位。
+
+> ℹ️ 首版骨架已实现:FastAPI `/v1` 服务 + OCR/YOLO/模板匹配三识别器,统一返回坐标/文字/置信度。模型权重需另行获取并在 `configs/models.yaml` 登记。详见 [开发文档](#开发文档)。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -115,9 +121,10 @@ _待补充：提供推理 / 训练的最小示例。_
 
 项目的设计与实现细节由以下文档持续维护，参与开发前请先阅读：
 
+- 🗃️ [文档中心（分类索引）](docs/README.md) —— 所有开发文档的统一入口。
 - 📌 [开发主线索引与进度](docs/DEVELOPMENT.md) —— **跨会话接手的第一入口**：文档地图、任务进度表、关键约定速查。
-- 📐 [设计文档（spec）](docs/superpowers/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
-- 🗂️ [实现计划](docs/superpowers/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
+- 📐 [设计文档（spec）](docs/specs/2026-06-03-recognition-service-design.md) —— 需求、范围与架构的权威来源。
+- 🗂️ [实现计划](docs/plans/2026-06-03-recognition-service.md) —— 分阶段、逐任务的 TDD 实现步骤。
 - 🧭 [架构决策记录（ADR）](docs/adr/) —— 重要技术取舍的逐条记录。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
@@ -126,12 +133,16 @@ _待补充：提供推理 / 训练的最小示例。_
 
 ## 路线图
 
-- [ ] 搭建项目骨架与依赖管理
-- [ ] 接入 YOLO 检测模块
-- [ ] 接入 OCR 识别模块
-- [ ] 串联检测 → 识别流水线
-- [ ] 提供 CLI / API 入口
-- [ ] 补充测试与文档
+- [x] 搭建项目骨架与依赖管理
+- [x] 接入 YOLO 检测模块（含模型注册表 + 懒加载）
+- [x] 接入 OCR 识别模块（PaddleOCR）
+- [x] 接入模板匹配模块（多尺度 + NMS）
+- [x] 统一识别管线（预处理 / 并发背压 / 坐标回映射）
+- [x] 提供 CLI 与 HTTP API（FastAPI `/v1`）入口
+- [x] 补充测试（单元 + 契约）与文档
+- [ ] 接入真实权重的端到端冒烟测试与 golden 用例
+- [ ] `/recognize` 多方法智能合并、ROI 完整落地、结果缓存
+- [ ] 标注图（debug）输出与 Prometheus 指标端点
 
 详见 [开放的 Issues](https://gitee.com/xiaozai-van-liu/OcrYoloEngine/issues)。
 

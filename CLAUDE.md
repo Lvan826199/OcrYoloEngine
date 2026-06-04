@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-本仓库目前处于早期脚手架阶段，仅包含说明文档与配置文件，**尚无源码、构建配置或测试套件**。下文记录的是当前已知信息，需随代码演进逐步补全。**在相关文件真正加入仓库之前，不要假设某些命令或模块已经存在。**
+首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像与质量门禁,81 个测试全绿。后续工作见 `docs/DEVELOPMENT.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
 
 ## 文档引用规则（强制）
 
@@ -21,9 +21,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 文档 | 作用 |
 |------|------|
+| `docs/README.md` | **文档中心索引**，按分类归档导航 |
 | `docs/DEVELOPMENT.md` | **开发主线索引 + 进度表 + 约定速查**，跨会话接手的第一入口 |
-| `docs/superpowers/specs/2026-06-03-recognition-service-design.md` | 设计 spec：需求与架构的权威来源 |
-| `docs/superpowers/plans/2026-06-03-recognition-service.md` | 实现计划：逐任务 TDD 步骤与完整代码 |
+| `docs/specs/2026-06-03-recognition-service-design.md` | 设计 spec：需求与架构的权威来源 |
+| `docs/plans/2026-06-03-recognition-service.md` | 实现计划：逐任务 TDD 步骤与完整代码 |
 | `docs/adr/` | 架构决策记录（MADR），重要技术取舍逐条记录 |
 
 规则：
@@ -99,8 +100,19 @@ docs: 完善安装说明与环境要求
 
 ## 常用命令
 
-_待补充：依赖安装、运行、lint、测试（含如何运行单个测试）。代码与工具链加入后再填写。_
+```bash
+uv sync --extra dev            # 安装开发依赖
+uv run pytest                  # 跑测试(默认跳过 smoke)
+uv run pytest -m smoke         # 跑真实模型冒烟测试
+uv run pytest tests/unit/test_xxx.py::test_name -v   # 跑单个测试
+uv run ruff check src tests    # lint
+uv run ruff format src tests   # 格式化
+uv run mypy                    # 类型检查
+uv run pre-commit run --all-files   # 全量质量门禁
+uv run ocr-yolo serve          # 启动服务
+uv run ocr-yolo infer img.png --methods ocr   # 本地单图推理
+```
 
 ## 架构
 
-_待补充：源码模块出现后，在此记录 OCR 阶段与 YOLO 检测阶段之间的整体数据流，以及模型权重的加载方式。_
+分层单体:`service`(FastAPI/v1)→ `concurrency`(有界池+模型锁)→ `preprocessing`(通道统一/ROI 回映射)→ `recognizers`(ocr/yolo/template 统一抽象)→ `models.registry`/`templates.store`(资产管理)。识别器只吃预处理图、吐基于输入图坐标的 `RawDetection`,坐标回映射与归一化统一在 `preprocessing.finalize_detections`。详见 `docs/specs/2026-06-03-recognition-service-design.md` 与 `docs/plans/2026-06-03-recognition-service.md`。

@@ -1,0 +1,7 @@
+# 示例数据集配置(ultralytics 格式)
+path: ./dataset
+train: images/train
+val: images/val
+names:
+  0: boss
+  1: coin
