@@ -197,9 +197,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 models_store/
-uv.lock
 ```
-> 说明:`uv.lock` 首版先不纳管(避免锁文件在多人/多平台抖动);若团队决定锁版本,可后续移除该行并提交锁文件。
+> 说明:`uv.lock` **纳入版本管理**(锁定依赖版本、保证多人/多平台可复现),不加入 `.gitignore`,提交时一并 `git add uv.lock`。
 
 - [ ] **Step 6: Commit**
 

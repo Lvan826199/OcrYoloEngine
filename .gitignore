@@ -32,5 +32,4 @@ models_store/*
 templates_store/*
 !templates_store/.gitkeep
 
-# uv 锁文件（可选，视团队策略）
-# uv.lock
+# uv 锁文件纳入版本管理(锁定依赖版本、保证可复现),不忽略
