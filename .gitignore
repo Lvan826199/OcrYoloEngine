@@ -32,4 +32,8 @@ models_store/*
 templates_store/*
 !templates_store/.gitkeep
 
+# 本地环境变量(保留 .env.example 作为模板)
+.env
+!.env.example
+
 # uv 锁文件纳入版本管理(锁定依赖版本、保证可复现),不忽略

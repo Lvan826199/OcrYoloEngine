@@ -39,6 +39,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **存在任何报错（测试失败、`ruff`/`mypy` 报错、构建失败）必须先修复，修复后全绿才允许 `git commit` / `git push`。** 严禁带着已知报错提交或推送代码。
 
+## 测试用真实数据（强制）
+
+**测试一律使用真实数据与真实依赖，不得用 mock / 假实现替代被测对象的核心行为。**
+
+- 图像处理、模板匹配、预处理、并发等:用**真实图片**(`numpy`/`cv2` 生成或样例图)、真实线程、真实文件,断言真实输出。
+- OCR / YOLO:用**真实模型**端到端验证(PaddleOCR 真实推理、YOLO 加载真实权重如 `yolov8n.pt`),放在 `tests/smoke/` 并打 `@pytest.mark.smoke`,通过 `uv run pytest -m smoke` 运行。
+- HTTP / 服务层:优先用**真实识别器**(如真实 `TemplateRecognizer` + 真实模板图)做端到端契约测试,而非注入假识别器。
+- 仅当某外部依赖在该测试环境**确实无法获得**时,才允许临时替身,且**必须有对应的真实冒烟测试兜底**,并在测试里注明原因。
+- 新增功能时,真实数据测试与代码同批提交;`tests/fixtures/` 放样例图与期望结果(坐标/置信度带容差)。
+
 ## 项目简介
 
 `OcrYoloEngine` 是一个 OCR + YOLO 引擎。根据 `.gitignore` 判断，这是一个 **Python** 项目，使用 PyTorch / ONNX 格式的模型权重（`*.pt`、`*.pth`、`*.weights`、`*.onnx`）。这些权重文件已被 git 忽略，**不应提交入库**，需单独获取或下载。
