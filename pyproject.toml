@@ -40,6 +40,10 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 依赖注入习惯用法:File/Form 作为参数默认值是预期写法,豁免 B008
+extend-immutable-calls = ["fastapi.File", "fastapi.Form"]
+
 [tool.mypy]
 python_version = "3.11"
 packages = ["ocr_yolo_engine"]
