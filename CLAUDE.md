@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像与质量门禁,81 个测试全绿。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
+首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁,默认 93 + 真实冒烟 4 个测试全绿。debug 标注图、模型热卸载/重载、Prometheus `/metrics` 等增强已落地。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
 
 ## 文档引用规则（强制）
 

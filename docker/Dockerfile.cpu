@@ -1,14 +1,24 @@
+# CPU 镜像:用 uv 按 uv.lock 安装,与开发/CI 同一工具链、版本可复现。
 FROM python:3.11-slim
 
-ENV PIP_NO_CACHE_DIR=1
+# uv:容器内用 copy 链接模式、预编译字节码
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md ./
+# 从官方镜像取 uv 可执行文件
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# 按锁文件安装(含 OCR/YOLO,排除 dev);--frozen 确保与 uv.lock 完全一致
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN pip install --upgrade pip && pip install ".[ocr,yolo]"
+RUN uv sync --frozen --no-dev --extra ocr --extra yolo
+
+# 把项目虚拟环境加入 PATH,使 ocr-yolo 命令可直接运行
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY configs ./configs
 ENV OYE_DEVICE=cpu

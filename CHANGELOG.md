@@ -33,5 +33,9 @@
 - 新增 **golden 真实样例回归测试**(`tests/fixtures/` 提交确定性样例图 + 期望结果)。
 - 新增**持续集成**:`scripts/check.sh`(门禁单一事实来源)、`Makefile` 快捷命令、`.github/workflows/ci.yml`(GitHub Actions),并说明 Gitee Go 接入方式。
 - 新增 **Prometheus 指标端点** `GET /metrics`:各识别方法的请求数与推理累计耗时(零额外依赖,文本暴露格式)。
+- **Docker 改用 uv**:CPU/GPU 镜像由 `pip install` 改为 `uv sync --frozen --no-dev --extra ocr --extra yolo`,按 `uv.lock` 安装,与开发/CI 同工具链、版本可复现、构建更快。
+
+### 变更
+- 文档同步:`项目说明`/`使用文档`/`部署文档`/`开发说明`/`设计与决策` 更新真实数据测试、新端点(`/metrics`、模型热管理)、debug 标注图、Docker(uv)等;去除过时的 fake/计数描述。
 
 [未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/master...HEAD

@@ -1,14 +1,26 @@
+# GPU 镜像:用 uv 按 uv.lock 安装。torch 的 CUDA wheel 由 PyPI 默认提供。
+# 注意:paddlepaddle 锁定的是 CPU 包;若 OCR 也要走 GPU,需改用 paddlepaddle-gpu
+#       (与 pip 方案同样的既有限制),在 pyproject 里按需调整后重新锁定。
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
-ENV DEBIAN_FRONTEND=noninteractive PIP_NO_CACHE_DIR=1
+ENV DEBIAN_FRONTEND=noninteractive \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
 WORKDIR /app
 
+# 只需系统库;Python 解释器由 uv 自动按 requires-python 下载管理
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3-pip libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+    libgl1 libglib2.0-0 ca-certificates && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md ./
+# 从官方镜像取 uv 可执行文件
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# 按锁文件安装(含 OCR/YOLO,排除 dev);uv 会自动获取 Python 3.11+
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN pip install --upgrade pip && pip install ".[ocr,yolo]"
+RUN uv sync --frozen --no-dev --extra ocr --extra yolo
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY configs ./configs
 ENV OYE_DEVICE=cuda
