@@ -10,6 +10,7 @@ import numpy as np
 
 from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.image.loader import load_from_base64, load_from_path
+from ocr_yolo_engine.observability import metrics
 from ocr_yolo_engine.observability.logging import current_request_id
 from ocr_yolo_engine.preprocessing.annotate import draw_detections
 from ocr_yolo_engine.preprocessing.pipeline import (
@@ -89,6 +90,7 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
 
         raws = ctx.executor.submit(model_key, _infer)
         elapsed_ms = (time.perf_counter() - started) * 1000
+        metrics.record(method, elapsed_ms, ok=True)
         detections = finalize_detections(list(raws), offset=offset, full_w=full_w, full_h=full_h)
 
         model_version = (

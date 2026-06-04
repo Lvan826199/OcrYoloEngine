@@ -5,9 +5,10 @@ from __future__ import annotations
 import base64
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 
 from ocr_yolo_engine.image.loader import decode_image_bytes
+from ocr_yolo_engine.observability import metrics
 from ocr_yolo_engine.observability.logging import bind_request_id, new_request_id
 from ocr_yolo_engine.pipeline_runner import run_recognition
 from ocr_yolo_engine.schemas import ImageInput, Method, RecognizeRequest, RecognizeResponse
@@ -116,3 +117,9 @@ def health() -> dict[str, Any]:
 def ready(request: Request) -> dict[str, Any]:
     ctx = _ctx(request)
     return {"status": "ready", "models": ctx.registry.list_models()}
+
+
+@router.get("/metrics")
+def metrics_endpoint() -> Response:
+    """Prometheus 文本格式指标:各方法请求数与推理累计耗时。无需鉴权。"""
+    return Response(content=metrics.render(), media_type="text/plain; version=0.0.4; charset=utf-8")

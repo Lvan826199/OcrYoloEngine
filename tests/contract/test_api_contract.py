@@ -208,3 +208,21 @@ def test_hot_management_requires_auth():
     c = make_client(settings=Settings(api_keys=["secret"], allowed_path_roots=[]))
     assert c.post("/v1/models/game/unload").status_code == 401
     assert c.post("/v1/models/game/reload").status_code == 401
+
+
+def test_metrics_endpoint_after_match(client, scene_with_target_b64):
+    """真实端到端:先发一次模板识别,再拉 /metrics,断言计数已记录(真实数据)。"""
+    client.post(
+        "/v1/match",
+        json={
+            "image": {"base64": scene_with_target_b64},
+            "methods": ["template"],
+            "templates": [TEMPLATE_NAME],
+        },
+    )
+    r = client.get("/metrics")
+    assert r.status_code == 200
+    body = r.text
+    assert "oye_requests_total" in body
+    assert 'method="template"' in body
+    assert "oye_inference_seconds_count" in body
