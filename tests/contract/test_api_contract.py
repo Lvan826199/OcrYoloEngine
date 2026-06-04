@@ -176,3 +176,35 @@ def test_auth_rejects_without_key_and_accepts_with_key(scene_with_target_b64):
     assert r.status_code == 401
     r2 = c.post("/v1/match", json=body, headers={"X-API-Key": "secret"})
     assert r2.status_code == 200
+
+
+def test_unload_unknown_model_404(client):
+    """卸载未注册模型:404 + MODEL_NOT_FOUND。"""
+    r = client.post("/v1/models/不存在/unload")
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "MODEL_NOT_FOUND"
+
+
+def test_reload_unknown_model_404(client):
+    """重载未注册模型:404 + MODEL_NOT_FOUND。"""
+    r = client.post("/v1/models/不存在/reload")
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "MODEL_NOT_FOUND"
+
+
+def test_unload_registered_model_ok(client):
+    """卸载已注册但未加载的 game 模型:200 no-op,真实轻量不触发权重加载。"""
+    r = client.post("/v1/models/game/unload")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "game"
+    assert body["status"] == "unloaded"
+    # game 从未加载,卸载后 loaded 列表不含它。
+    assert "game" not in body["loaded"]
+
+
+def test_hot_management_requires_auth():
+    """开启 api_keys 时,热管理端点无 key 应 401。"""
+    c = make_client(settings=Settings(api_keys=["secret"], allowed_path_roots=[]))
+    assert c.post("/v1/models/game/unload").status_code == 401
+    assert c.post("/v1/models/game/reload").status_code == 401

@@ -62,6 +62,56 @@ def test_yolo_real_inference():
         assert all(isinstance(v, float) for v in d.bbox)
 
 
+def test_reload_real_model_http():
+    """真实 TestClient + 真实可加载 registry:POST reload 真实加载 yolov8n 权重。"""
+    pytest.importorskip("ultralytics")
+
+    from fastapi.testclient import TestClient
+
+    from ocr_yolo_engine.concurrency.executor import InferenceExecutor
+    from ocr_yolo_engine.models.registry import ModelRegistry, ModelSpec
+    from ocr_yolo_engine.recognizers.ocr import OcrRecognizer
+    from ocr_yolo_engine.recognizers.template import TemplateRecognizer
+    from ocr_yolo_engine.recognizers.yolo import YoloRecognizer, load_yolo_model
+    from ocr_yolo_engine.service.app import create_app
+    from ocr_yolo_engine.service.deps import AppContext
+    from ocr_yolo_engine.settings import Settings
+    from tests.conftest import build_template_store
+
+    settings = Settings(api_keys=[], allowed_path_roots=[])
+    # 真实可加载 registry:reload 会触发 load_yolo_model 真实下载/加载权重。
+    registry = ModelRegistry(
+        {"yolov8n": ModelSpec(name="yolov8n", path="yolov8n.pt", version="v8n", classes={})},
+        loader_fn=load_yolo_model,
+        cache_size=1,
+    )
+    store = build_template_store()
+    ctx = AppContext(
+        settings=settings,
+        registry=registry,
+        template_store=store,
+        executor=InferenceExecutor(max_workers=2, max_queue=8, timeout_s=30),
+        recognizers={
+            "ocr": OcrRecognizer(settings=settings),
+            "yolo": YoloRecognizer(registry=registry),
+            "template": TemplateRecognizer(store=store),
+        },
+    )
+    client = TestClient(create_app(ctx=ctx))
+
+    try:
+        r = client.post("/v1/models/yolov8n/reload")
+    except Exception as exc:  # noqa: BLE001 - 权重下载/联网失败时优雅跳过
+        pytest.skip(f"无法获取 yolov8n 权重:{exc}")
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "reloaded"
+    assert body["version"] == "v8n"
+    # 真实加载成功后,缓存里应含 yolov8n。
+    assert "yolov8n" in registry.loaded_names()
+
+
 def test_template_real_http_e2e():
     """真实 TestClient + 真实模板:无重依赖,完整 HTTP 跑通模板匹配。"""
     from tests.conftest import PATCH_CENTER, SCENE_H, SCENE_W, TEMPLATE_NAME, make_client

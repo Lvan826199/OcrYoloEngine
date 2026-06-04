@@ -81,6 +81,24 @@ def list_models(request: Request) -> dict[str, Any]:
     return {"models": [{"name": n, "version": reg.spec(n).version} for n in reg.list_models()]}
 
 
+@router.post("/v1/models/{name}/unload", dependencies=_AUTH)
+def unload_model(request: Request, name: str) -> dict[str, Any]:
+    """卸载模型缓存(释放显存/内存)。name 未注册返回 404;已注册但未加载是 no-op。"""
+    reg = _ctx(request).registry
+    reg.spec(name)  # 未注册抛 MODEL_NOT_FOUND → 全局异常处理器转 404
+    reg.unload(name)
+    return {"name": name, "status": "unloaded", "loaded": reg.loaded_names()}
+
+
+@router.post("/v1/models/{name}/reload", dependencies=_AUTH)
+def reload_model(request: Request, name: str) -> dict[str, Any]:
+    """重载模型(真实加载权重),用于不重启切换/刷新模型。name 未注册返回 404。"""
+    reg = _ctx(request).registry
+    reg.spec(name)  # 未注册抛 MODEL_NOT_FOUND → 全局异常处理器转 404
+    reg.reload(name)
+    return {"name": name, "version": reg.spec(name).version, "status": "reloaded"}
+
+
 @router.get("/v1/templates", dependencies=_AUTH)
 def list_templates(request: Request) -> dict[str, Any]:
     store = _ctx(request).template_store
