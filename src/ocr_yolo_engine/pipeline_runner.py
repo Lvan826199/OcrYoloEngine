@@ -86,14 +86,10 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
 
         raws = ctx.executor.submit(model_key, _infer)
         elapsed_ms = (time.perf_counter() - started) * 1000
-        detections = finalize_detections(
-            list(raws), offset=offset, full_w=full_w, full_h=full_h
-        )
+        detections = finalize_detections(list(raws), offset=offset, full_w=full_w, full_h=full_h)
 
         model_version = (
-            ctx.registry.spec(req.model).version
-            if method == "yolo" and req.model
-            else None
+            ctx.registry.spec(req.model).version if method == "yolo" and req.model else None
         )
         template_versions = (
             _template_versions(ctx, req.templates)

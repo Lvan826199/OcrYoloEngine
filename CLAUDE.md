@@ -100,8 +100,19 @@ docs: 完善安装说明与环境要求
 
 ## 常用命令
 
-_待补充：依赖安装、运行、lint、测试（含如何运行单个测试）。代码与工具链加入后再填写。_
+```bash
+uv sync --extra dev            # 安装开发依赖
+uv run pytest                  # 跑测试(默认跳过 smoke)
+uv run pytest -m smoke         # 跑真实模型冒烟测试
+uv run pytest tests/unit/test_xxx.py::test_name -v   # 跑单个测试
+uv run ruff check src tests    # lint
+uv run ruff format src tests   # 格式化
+uv run mypy                    # 类型检查
+uv run pre-commit run --all-files   # 全量质量门禁
+uv run ocr-yolo serve          # 启动服务
+uv run ocr-yolo infer img.png --methods ocr   # 本地单图推理
+```
 
 ## 架构
 
-_待补充：源码模块出现后，在此记录 OCR 阶段与 YOLO 检测阶段之间的整体数据流，以及模型权重的加载方式。_
+分层单体:`service`(FastAPI/v1)→ `concurrency`(有界池+模型锁)→ `preprocessing`(通道统一/ROI 回映射)→ `recognizers`(ocr/yolo/template 统一抽象)→ `models.registry`/`templates.store`(资产管理)。识别器只吃预处理图、吐基于输入图坐标的 `RawDetection`,坐标回映射与归一化统一在 `preprocessing.finalize_detections`。详见 `docs/specs/2026-06-03-recognition-service-design.md` 与 `docs/plans/2026-06-03-recognition-service.md`。

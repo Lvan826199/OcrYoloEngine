@@ -85,9 +85,7 @@ def list_models(request: Request) -> dict[str, Any]:
 def list_templates(request: Request) -> dict[str, Any]:
     store = _ctx(request).template_store
     return {
-        "templates": [
-            {"name": n, "version": store.spec(n).version} for n in store.list_templates()
-        ]
+        "templates": [{"name": n, "version": store.spec(n).version} for n in store.list_templates()]
     }
 
 

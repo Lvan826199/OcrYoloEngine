@@ -22,7 +22,5 @@ def _settings_for(request: Request) -> Settings:
     return get_settings()
 
 
-async def require_api_key(
-    request: Request, x_api_key: str | None = Header(default=None)
-) -> None:
+async def require_api_key(request: Request, x_api_key: str | None = Header(default=None)) -> None:
     verify_api_key(x_api_key, _settings_for(request))
