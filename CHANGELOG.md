@@ -27,5 +27,10 @@
 - 新增**使用指南** `docs/guide/`:快速开始、小白操作文档、使用文档(API/CLI/配置/错误码)、部署文档(本地/Docker/调优)、项目详细文档(流程/核心技术/架构);完善 README 的快速开始/使用方法/部署。
 - `uv.lock` 纳入版本管理(锁定依赖版本)。
 - 文档收敛:整合为 6 个中文文件名文档(项目说明/快速开始/使用文档/部署文档/设计与决策/开发说明),移除分散的 guide/specs/plans/adr 目录。
+- **测试改造为真实数据**:移除全部假识别器(`FakeRecognizer`),契约/管线/模板测试改用真实 `TemplateRecognizer` + 真实图;新增真实模型冒烟测试(真实 PaddleOCR / yolov8n / 模板 HTTP 端到端);写入「测试用真实数据(强制)」规则与 `.env.example`。
+- `debug=true` 时返回识别结果的**标注图**(在原图上画框,base64 PNG)。
+- 新增**模型热管理 HTTP 接口**:`POST /v1/models/{name}/unload`、`POST /v1/models/{name}/reload`(不重启切换/刷新模型)。
+- 新增 **golden 真实样例回归测试**(`tests/fixtures/` 提交确定性样例图 + 期望结果)。
+- 新增**持续集成**:`scripts/check.sh`(门禁单一事实来源)、`Makefile` 快捷命令、`.github/workflows/ci.yml`(GitHub Actions),并说明 Gitee Go 接入方式。
 
 [未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/master...HEAD

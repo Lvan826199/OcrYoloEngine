@@ -1,0 +1,24 @@
+# 持续集成:在推送/PR 到 master 时跑全量质量门禁。
+# 注:本仓库主库在 Gitee。若使用 Gitee Go,请在 Gitee 流水线中执行
+# `bash scripts/check.sh`(与本文件等价);本文件用于 GitHub 镜像场景。
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: 全量门禁(lint + 类型 + 测试)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          bash scripts/check.sh
