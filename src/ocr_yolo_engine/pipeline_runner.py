@@ -40,13 +40,16 @@ def _template_versions(ctx: AppContext, names: list[str]) -> dict[str, str]:
 def _load_bytes_and_image(ctx: AppContext, req: RecognizeRequest) -> tuple[bytes, np.ndarray]:
     """返回 (raw_bytes, bgr_image)。raw_bytes 仅用于大小上限校验。"""
     if req.image.base64 is not None:
+        # 先走 loader 解码:非法 base64 / 非图片在此抛 INVALID_IMAGE
+        img = load_from_base64(req.image.base64)
         payload = (
             req.image.base64.split(",", 1)[1]
             if req.image.base64.startswith("data:")
             else req.image.base64
         )
-        raw = base64.b64decode(payload)
-        return raw, load_from_base64(req.image.base64)
+        # 解码到此处已通过校验,raw 仅供字节数上限判断
+        raw = base64.b64decode(payload, validate=True)
+        return raw, img
     assert req.image.path is not None
     img = load_from_path(req.image.path, ctx.settings.allowed_path_roots)
     return b"", img
