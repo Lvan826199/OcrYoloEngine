@@ -8,6 +8,7 @@ import time
 import cv2
 import numpy as np
 
+from ocr_yolo_engine.cache import CachedResult, compute_cache_key
 from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.image.loader import load_from_base64, load_from_path
 from ocr_yolo_engine.observability import metrics
@@ -69,6 +70,23 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
         max_pixels=ctx.settings.max_image_pixels,
     )
     full_h, full_w = bgr.shape[:2]
+
+    # 结果缓存守卫(外挂,不改核心计算):仅在缓存开启且非 off、非 debug 时生效。
+    cache_on = ctx.settings.result_cache_size > 0 and req.cache != "off" and not req.debug
+    key = compute_cache_key(bgr, req) if cache_on else None
+    # 读:仅 auto 模式读缓存(refresh 强制重算)。
+    if cache_on and key is not None and req.cache == "auto":
+        hit = ctx.cache.get(key)
+        if hit is not None:
+            metrics.cache_event("hit")
+            return RecognizeResponse(
+                request_id=request_id,
+                image_size=hit.image_size,
+                method_results=hit.method_results,
+                debug_image=None,
+                from_cache=True,
+            )
+
     rgb = to_rgb(bgr)
     cropped, offset = crop_roi(rgb, req.roi)
 
@@ -110,11 +128,17 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
 
     debug_image = _build_debug_image(bgr, method_results) if req.debug else None
 
+    # 写:auto/refresh 均在算完后写入(off 时 cache_on 为 False,完全绕过)。
+    if cache_on and key is not None:
+        metrics.cache_event("miss")
+        ctx.cache.set(key, CachedResult(method_results, [full_w, full_h]))
+
     return RecognizeResponse(
         request_id=request_id,
         image_size=[full_w, full_h],
         method_results=method_results,
         debug_image=debug_image,
+        from_cache=False,
     )
 
 

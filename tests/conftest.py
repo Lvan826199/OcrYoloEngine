@@ -12,6 +12,7 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
+from ocr_yolo_engine.cache import LruResultCache, NullResultCache, ResultCache
 from ocr_yolo_engine.concurrency.executor import InferenceExecutor
 from ocr_yolo_engine.models.registry import ModelRegistry, ModelSpec
 from ocr_yolo_engine.recognizers.ocr import OcrRecognizer
@@ -52,9 +53,14 @@ def build_template_store() -> TemplateStore:
     )
 
 
-def build_context(settings: Settings | None = None) -> AppContext:
-    """构造真实 AppContext:真实模板识别器 + 真实(懒加载)OCR/YOLO 识别器。"""
-    settings = settings or Settings(api_keys=[], allowed_path_roots=[])
+def build_context(settings: Settings | None = None, result_cache_size: int = 0) -> AppContext:
+    """构造真实 AppContext:真实模板识别器 + 真实(懒加载)OCR/YOLO 识别器。
+
+    result_cache_size>0 时注入真实 LruResultCache(并在未显式给 settings 时同步开启),
+    便于契约测试端到端验证缓存命中/失效。
+    """
+    if settings is None:
+        settings = Settings(api_keys=[], allowed_path_roots=[], result_cache_size=result_cache_size)
     # registry 仅用于 /v1/models 列举,不真实加载权重(默认套件不触发 get)。
     registry = ModelRegistry(
         {"game": ModelSpec(name="game", path="game.pt", version="v1", classes={})},
@@ -62,6 +68,9 @@ def build_context(settings: Settings | None = None) -> AppContext:
         cache_size=1,
     )
     store = build_template_store()
+    cache: ResultCache = (
+        LruResultCache(result_cache_size) if result_cache_size > 0 else NullResultCache()
+    )
     return AppContext(
         settings=settings,
         registry=registry,
@@ -72,12 +81,13 @@ def build_context(settings: Settings | None = None) -> AppContext:
             "yolo": YoloRecognizer(registry=registry),
             "template": TemplateRecognizer(store=store),
         },
+        cache=cache,
     )
 
 
-def make_client(settings: Settings | None = None) -> TestClient:
-    """构造注入真实识别器的 TestClient。"""
-    return TestClient(create_app(ctx=build_context(settings)))
+def make_client(settings: Settings | None = None, result_cache_size: int = 0) -> TestClient:
+    """构造注入真实识别器的 TestClient;result_cache_size>0 时开启真实结果缓存。"""
+    return TestClient(create_app(ctx=build_context(settings, result_cache_size=result_cache_size)))
 
 
 @pytest.fixture

@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     templates_config_path: str = "configs/templates.yaml"
 
     model_cache_size: int = 3
+    # 结果缓存:size=0 时完全关闭(默认),核心管线零开销;ttl_s=0 表示不过期。
+    result_cache_size: int = 0
+    result_cache_ttl_s: int = 0
     max_workers: int = 4
     max_queue: int = 32
     request_timeout_s: int = 30

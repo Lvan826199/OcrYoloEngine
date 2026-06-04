@@ -12,6 +12,7 @@ _lock = threading.Lock()
 _requests: dict[tuple[str, str], int] = defaultdict(int)  # (method, status) -> 次数
 _seconds_sum: dict[str, float] = defaultdict(float)  # method -> 累计耗时(秒)
 _seconds_count: dict[str, int] = defaultdict(int)  # method -> 次数
+_cache_events: dict[str, int] = defaultdict(int)  # event(hit/miss) -> 次数
 
 
 def record(method: str, elapsed_ms: float, ok: bool = True) -> None:
@@ -23,12 +24,19 @@ def record(method: str, elapsed_ms: float, ok: bool = True) -> None:
         _seconds_count[method] += 1
 
 
+def cache_event(event: str) -> None:
+    """记录一次结果缓存事件:event 为 "hit" 或 "miss"。"""
+    with _lock:
+        _cache_events[event] += 1
+
+
 def reset() -> None:
     """清空所有计数(主要给测试用)。"""
     with _lock:
         _requests.clear()
         _seconds_sum.clear()
         _seconds_count.clear()
+        _cache_events.clear()
 
 
 def render() -> str:
@@ -48,4 +56,8 @@ def render() -> str:
             lines.append(
                 f'oye_inference_seconds_count{{method="{method}"}} {_seconds_count[method]}'
             )
+        lines.append("# HELP oye_cache_events_total 结果缓存命中/未命中次数")
+        lines.append("# TYPE oye_cache_events_total counter")
+        for event in sorted(_cache_events):
+            lines.append(f'oye_cache_events_total{{event="{event}"}} {_cache_events[event]}')
     return "\n".join(lines) + "\n"

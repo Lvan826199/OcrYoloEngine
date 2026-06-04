@@ -210,6 +210,81 @@ def test_hot_management_requires_auth():
     assert c.post("/v1/models/game/reload").status_code == 401
 
 
+def _match_body(b64: str, cache: str | None = None) -> dict:
+    body: dict = {
+        "image": {"base64": b64},
+        "methods": ["template"],
+        "templates": [TEMPLATE_NAME],
+    }
+    if cache is not None:
+        body["cache"] = cache
+    return body
+
+
+def test_cache_hit_on_second_match(scene_with_target_b64):
+    """开缓存:同一 /v1/match 连发两次,第一次 MISS、第二次 HIT,detections 一致。"""
+    c = make_client(result_cache_size=16)
+    r1 = c.post("/v1/match", json=_match_body(scene_with_target_b64))
+    assert r1.status_code == 200
+    assert r1.headers["X-Cache"] == "MISS"
+    assert r1.json()["from_cache"] is False
+
+    r2 = c.post("/v1/match", json=_match_body(scene_with_target_b64))
+    assert r2.status_code == 200
+    assert r2.headers["X-Cache"] == "HIT"
+    assert r2.json()["from_cache"] is True
+    # 命中结果与首次一致。
+    d1 = r1.json()["method_results"]["template"]["detections"]
+    d2 = r2.json()["method_results"]["template"]["detections"]
+    assert d1 == d2
+    assert d2, "应有检出"
+
+
+def test_cache_off_always_bypass(scene_with_target_b64):
+    """开缓存但请求 cache=off:两次都 from_cache=False、X-Cache=BYPASS。"""
+    c = make_client(result_cache_size=16)
+    for _ in range(2):
+        r = c.post("/v1/match", json=_match_body(scene_with_target_b64, cache="off"))
+        assert r.status_code == 200
+        assert r.headers["X-Cache"] == "BYPASS"
+        assert r.json()["from_cache"] is False
+
+
+def test_cache_invalidated_by_model_unload(scene_with_target_b64):
+    """开缓存→match(写入)→再 match(HIT)→unload 模型(清缓存)→再 match 应 MISS。"""
+    c = make_client(result_cache_size=16)
+    c.post("/v1/match", json=_match_body(scene_with_target_b64))
+    r_hit = c.post("/v1/match", json=_match_body(scene_with_target_b64))
+    assert r_hit.headers["X-Cache"] == "HIT"
+
+    r_unload = c.post("/v1/models/game/unload")
+    assert r_unload.status_code == 200
+
+    r_after = c.post("/v1/match", json=_match_body(scene_with_target_b64))
+    assert r_after.status_code == 200
+    assert r_after.headers["X-Cache"] == "MISS", "卸载后缓存应被清空"
+    assert r_after.json()["from_cache"] is False
+
+
+def test_cache_disabled_by_default_bypass(client, scene_with_target_b64):
+    """默认 client(缓存关闭):X-Cache=BYPASS、from_cache=False,确认零影响。"""
+    r = client.post("/v1/match", json=_match_body(scene_with_target_b64))
+    assert r.status_code == 200
+    assert r.headers["X-Cache"] == "BYPASS"
+    assert r.json()["from_cache"] is False
+
+
+def test_cache_refresh_recomputes_then_writes(scene_with_target_b64):
+    """cache=refresh:不读、强制算并写(MISS);随后 auto 应能命中。"""
+    c = make_client(result_cache_size=16)
+    c.post("/v1/match", json=_match_body(scene_with_target_b64))  # 写入
+    r_refresh = c.post("/v1/match", json=_match_body(scene_with_target_b64, cache="refresh"))
+    assert r_refresh.headers["X-Cache"] == "MISS"
+    assert r_refresh.json()["from_cache"] is False
+    r_auto = c.post("/v1/match", json=_match_body(scene_with_target_b64))
+    assert r_auto.headers["X-Cache"] == "HIT"
+
+
 def test_metrics_endpoint_after_match(client, scene_with_target_b64):
     """真实端到端:先发一次模板识别,再拉 /metrics,断言计数已记录(真实数据)。"""
     client.post(

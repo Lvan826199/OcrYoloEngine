@@ -36,6 +36,8 @@ class RecognizeRequest(BaseModel):
     conf_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
     roi: ROI | None = None
     debug: bool = False
+    # 结果缓存模式:auto=读+写、refresh=强制算并写、off=完全绕过(仅在缓存开启时生效)。
+    cache: Literal["auto", "refresh", "off"] = "auto"
 
     @model_validator(mode="after")
     def _method_requirements(self) -> RecognizeRequest:
@@ -69,6 +71,7 @@ class RecognizeResponse(BaseModel):
     image_size: list[int]
     method_results: dict[Method, MethodResult] = Field(default_factory=dict)
     debug_image: str | None = None
+    from_cache: bool = False
 
 
 class ErrorResponse(BaseModel):

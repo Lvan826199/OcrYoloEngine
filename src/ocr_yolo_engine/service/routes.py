@@ -25,36 +25,46 @@ def _ctx(request: Request) -> AppContext:
     return cast(AppContext, request.app.state.ctx)
 
 
-def _run(request: Request, req: RecognizeRequest) -> RecognizeResponse:
+def _run(request: Request, req: RecognizeRequest, response: Response) -> RecognizeResponse:
     bind_request_id(new_request_id())
-    return run_recognition(_ctx(request), req)
+    ctx = _ctx(request)
+    result = run_recognition(ctx, req)
+    # X-Cache 头:缓存关闭或本次 off → BYPASS;命中 → HIT;算了且缓存开 → MISS。
+    if ctx.settings.result_cache_size == 0 or req.cache == "off":
+        response.headers["X-Cache"] = "BYPASS"
+    elif result.from_cache:
+        response.headers["X-Cache"] = "HIT"
+    else:
+        response.headers["X-Cache"] = "MISS"
+    return result
 
 
 @router.post("/v1/ocr", response_model=RecognizeResponse, dependencies=_AUTH)
-def ocr(request: Request, body: ImageInput) -> RecognizeResponse:
-    return _run(request, RecognizeRequest(image=body, methods=["ocr"]))
+def ocr(request: Request, body: ImageInput, response: Response) -> RecognizeResponse:
+    return _run(request, RecognizeRequest(image=body, methods=["ocr"]), response)
 
 
 @router.post("/v1/detect", response_model=RecognizeResponse, dependencies=_AUTH)
-def detect(request: Request, body: RecognizeRequest) -> RecognizeResponse:
+def detect(request: Request, body: RecognizeRequest, response: Response) -> RecognizeResponse:
     body.methods = ["yolo"]
-    return _run(request, body)
+    return _run(request, body, response)
 
 
 @router.post("/v1/match", response_model=RecognizeResponse, dependencies=_AUTH)
-def match(request: Request, body: RecognizeRequest) -> RecognizeResponse:
+def match(request: Request, body: RecognizeRequest, response: Response) -> RecognizeResponse:
     body.methods = ["template"]
-    return _run(request, body)
+    return _run(request, body, response)
 
 
 @router.post("/v1/recognize", response_model=RecognizeResponse, dependencies=_AUTH)
-def recognize(request: Request, body: RecognizeRequest) -> RecognizeResponse:
-    return _run(request, body)
+def recognize(request: Request, body: RecognizeRequest, response: Response) -> RecognizeResponse:
+    return _run(request, body, response)
 
 
 @router.post("/v1/recognize/upload", response_model=RecognizeResponse, dependencies=_AUTH)
 async def recognize_upload(
     request: Request,
+    response: Response,
     file: UploadFile = File(...),
     methods: str = Form(...),
     model: str | None = Form(default=None),
@@ -73,7 +83,7 @@ async def recognize_upload(
         templates=template_list,
         conf_threshold=conf_threshold,
     )
-    return _run(request, req)
+    return _run(request, req, response)
 
 
 @router.get("/v1/models", dependencies=_AUTH)
@@ -88,6 +98,8 @@ def unload_model(request: Request, name: str) -> dict[str, Any]:
     reg = _ctx(request).registry
     reg.spec(name)  # 未注册抛 MODEL_NOT_FOUND → 全局异常处理器转 404
     reg.unload(name)
+    # 资产变更,旧缓存可能失效,整体清空(关闭态为 no-op)。
+    _ctx(request).cache.clear()
     return {"name": name, "status": "unloaded", "loaded": reg.loaded_names()}
 
 
@@ -97,6 +109,8 @@ def reload_model(request: Request, name: str) -> dict[str, Any]:
     reg = _ctx(request).registry
     reg.spec(name)  # 未注册抛 MODEL_NOT_FOUND → 全局异常处理器转 404
     reg.reload(name)
+    # 资产变更,旧缓存作废,整体清空(关闭态为 no-op)。
+    _ctx(request).cache.clear()
     return {"name": name, "version": reg.spec(name).version, "status": "reloaded"}
 
 

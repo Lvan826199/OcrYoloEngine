@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from ocr_yolo_engine.cache import LruResultCache, NullResultCache, ResultCache
 from ocr_yolo_engine.concurrency.executor import InferenceExecutor
 from ocr_yolo_engine.config_loader import load_model_specs, load_template_specs
 from ocr_yolo_engine.models.registry import ModelRegistry
@@ -22,6 +23,8 @@ class AppContext:
     template_store: TemplateStore
     executor: InferenceExecutor
     recognizers: dict[Method, object]
+    # 结果缓存:默认 Null(关闭),确保手工构造 AppContext 的现有测试不破。
+    cache: ResultCache = field(default_factory=NullResultCache)
 
 
 def build_context(settings: Settings | None = None) -> AppContext:
@@ -42,4 +45,9 @@ def build_context(settings: Settings | None = None) -> AppContext:
         "yolo": YoloRecognizer(registry=registry),
         "template": TemplateRecognizer(store=template_store),
     }
-    return AppContext(settings, registry, template_store, executor, recognizers)
+    cache: ResultCache
+    if settings.result_cache_size > 0:
+        cache = LruResultCache(settings.result_cache_size, settings.result_cache_ttl_s)
+    else:
+        cache = NullResultCache()
+    return AppContext(settings, registry, template_store, executor, recognizers, cache)
