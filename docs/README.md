@@ -26,6 +26,7 @@
 
 - [ADR 索引与约定](adr/README.md)
 - [0001 记录架构决策](adr/0001-record-architecture-decisions.md)
+- [0002 模板匹配采用归一化 SAD 置信度](adr/0002-template-matching-scoring.md)
 
 ## 🔗 仓库根目录相关文档
 

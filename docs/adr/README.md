@@ -13,3 +13,4 @@
 ## 索引
 
 - 0001 - 记录架构决策（见 [`0001-record-architecture-decisions.md`](0001-record-architecture-decisions.md)）
+- 0002 - 模板匹配采用归一化 SAD 置信度（见 [`0002-template-matching-scoring.md`](0002-template-matching-scoring.md)）

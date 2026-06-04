@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-本仓库目前处于早期脚手架阶段，仅包含说明文档与配置文件，**尚无源码、构建配置或测试套件**。下文记录的是当前已知信息，需随代码演进逐步补全。**在相关文件真正加入仓库之前，不要假设某些命令或模块已经存在。**
+首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像与质量门禁,81 个测试全绿。后续工作见 `docs/DEVELOPMENT.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
 
 ## 文档引用规则（强制）
 
