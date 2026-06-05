@@ -10,7 +10,7 @@ https://github.com/othneildrew/Best-README-Template
 <h1 align="center">OcrYoloEngine</h1>
 
 <p align="center">
-  帮自动化脚本"看懂"截图的服务：文字识别 + 目标检测 + 模板匹配,返回坐标和文字,不执行点击。
+  面向自动化测试的视觉识别 HTTP 服务。截图发过来，返回文字和目标的坐标，支持 OCR 文字识别、YOLO 目标检测、模板匹配三种方式，统一接口统一格式，开箱即用。
   <br />
   <a href="#关于项目"><strong>探索文档 »</strong></a>
   <br />
