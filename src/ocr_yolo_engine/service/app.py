@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from ocr_yolo_engine.errors import EngineError
 from ocr_yolo_engine.observability.logging import current_request_id, setup_logging
@@ -25,6 +25,10 @@ def create_app(ctx: AppContext | None = None, settings: Settings | None = None) 
         return JSONResponse(
             status_code=exc.http_status, content=exc.to_body(current_request_id()), headers=headers
         )
+
+    @app.get("/", include_in_schema=False)
+    async def _root() -> RedirectResponse:
+        return RedirectResponse(url="/docs")
 
     app.include_router(router)
     return app

@@ -47,6 +47,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     port = _find_free_port(args.host, args.port)
     if port != args.port:
         print(f"端口 {args.port} 已被占用，自动切换到 {port}")
+    browse_host = "localhost" if args.host == "0.0.0.0" else args.host
+    print(f"浏览器打开 http://{browse_host}:{port}/docs 查看接口文档")
     uvicorn.run(create_app(), host=args.host, port=port)
     return 0
 
