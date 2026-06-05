@@ -121,7 +121,7 @@ uv run ruff check src tests    # lint
 uv run ruff format src tests   # 格式化
 uv run mypy                    # 类型检查
 uv run pre-commit run --all-files   # 全量质量门禁
-uv run ocr-yolo serve          # 启动服务
+uv run ocr-yolo serve          # 启动服务(默认 8000,被占自动切下一个)
 uv run ocr-yolo infer img.png --methods ocr   # 本地单图推理
 ```
 

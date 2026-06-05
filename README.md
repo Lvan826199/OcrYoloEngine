@@ -99,7 +99,7 @@ cd OcrYoloEngine
 uv sync                          # 基础:HTTP 服务 + 模板匹配
 uv sync --extra yolo --extra ocr # 需要 YOLO / OCR 时(会拉 torch / paddle 大包)
 
-uv run ocr-yolo serve            # 启动服务,默认 http://0.0.0.0:8000
+uv run ocr-yolo serve            # 启动服务,默认 8000 端口(被占自动切下一个)
 ```
 
 健康检查:`curl http://localhost:8000/health` → `{"status":"ok"}`。交互式接口文档:`http://localhost:8000/docs`。
