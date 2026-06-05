@@ -30,7 +30,8 @@ def load_from_base64(b64: str) -> np.ndarray:
     return decode_image_bytes(data)
 
 
-def load_from_path(path: str, allowed_roots: list[str]) -> np.ndarray:
+def load_from_path(path: str, allowed_roots: list[str]) -> tuple[bytes, np.ndarray]:
+    """加载本地路径图片,返回 (原始字节, BGR 图像)。原始字节用于大小上限校验。"""
     real = os.path.realpath(path)
     roots = [os.path.realpath(r) for r in allowed_roots]
     if not any(real == r or real.startswith(r + os.sep) for r in roots):
@@ -42,4 +43,5 @@ def load_from_path(path: str, allowed_roots: list[str]) -> np.ndarray:
     if not os.path.isfile(real):
         raise EngineError(ErrorCode.INVALID_IMAGE, "文件不存在", details={"path": path})
     with open(real, "rb") as fh:
-        return decode_image_bytes(fh.read())
+        data = fh.read()
+    return data, decode_image_bytes(data)

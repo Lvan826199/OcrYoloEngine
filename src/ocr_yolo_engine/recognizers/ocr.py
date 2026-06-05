@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 import numpy as np
@@ -14,13 +15,32 @@ class OcrRecognizer:
     def __init__(self, engine: Any | None = None, settings: Settings | None = None) -> None:
         self._engine = engine
         self._settings = settings or get_settings()
+        self._init_lock = threading.Lock()
+
+    def _resolve_use_gpu(self) -> bool:
+        if self._settings.device == "cuda":
+            return True
+        if self._settings.device == "cpu":
+            return False
+        try:
+            import paddle
+
+            return bool(
+                paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0
+            )
+        except Exception:
+            return False
 
     def _ensure_engine(self) -> Any:
-        if self._engine is None:
-            from paddleocr import PaddleOCR  # 懒加载,避免顶层导入 paddle
+        if self._engine is not None:
+            return self._engine
+        with self._init_lock:
+            if self._engine is None:
+                from paddleocr import PaddleOCR  # 懒加载,避免顶层导入 paddle
 
-            use_gpu = self._settings.device == "cuda"
-            self._engine = PaddleOCR(use_angle_cls=True, lang="ch", use_gpu=use_gpu)
+                self._engine = PaddleOCR(
+                    use_angle_cls=True, lang="ch", use_gpu=self._resolve_use_gpu()
+                )
         return self._engine
 
     def infer(self, image: np.ndarray, ctx: InferContext) -> list[RawDetection]:

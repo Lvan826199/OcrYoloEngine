@@ -42,9 +42,11 @@ def test_load_from_base64_with_data_uri_prefix():
 
 def test_load_from_path_inside_whitelist(tmp_path):
     p = tmp_path / "a.png"
-    p.write_bytes(_png_bytes())
-    img = load_from_path(str(p), allowed_roots=[str(tmp_path)])
+    png_data = _png_bytes()
+    p.write_bytes(png_data)
+    raw, img = load_from_path(str(p), allowed_roots=[str(tmp_path)])
     assert img.shape == (3, 4, 3)
+    assert raw == png_data
 
 
 def test_load_from_path_traversal_blocked(tmp_path):

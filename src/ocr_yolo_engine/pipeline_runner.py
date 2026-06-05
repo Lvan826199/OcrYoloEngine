@@ -10,7 +10,7 @@ import numpy as np
 
 from ocr_yolo_engine.cache import CachedResult, compute_cache_key
 from ocr_yolo_engine.errors import EngineError, ErrorCode
-from ocr_yolo_engine.image.loader import load_from_base64, load_from_path
+from ocr_yolo_engine.image.loader import decode_image_bytes, load_from_path
 from ocr_yolo_engine.merge import merge_detections
 from ocr_yolo_engine.observability import metrics
 from ocr_yolo_engine.observability.logging import current_request_id
@@ -44,21 +44,23 @@ def _template_versions(ctx: AppContext, names: list[str]) -> dict[str, str]:
 
 
 def _load_bytes_and_image(ctx: AppContext, req: RecognizeRequest) -> tuple[bytes, np.ndarray]:
-    """返回 (raw_bytes, bgr_image)。raw_bytes 仅用于大小上限校验。"""
+    """返回 (raw_bytes, bgr_image)。raw_bytes 用于字节大小上限校验。"""
     if req.image.base64 is not None:
-        # 先走 loader 解码:非法 base64 / 非图片在此抛 INVALID_IMAGE
-        img = load_from_base64(req.image.base64)
+        import binascii
+
         payload = (
             req.image.base64.split(",", 1)[1]
             if req.image.base64.startswith("data:")
             else req.image.base64
         )
-        # 解码到此处已通过校验,raw 仅供字节数上限判断
-        raw = base64.b64decode(payload, validate=True)
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise EngineError(ErrorCode.INVALID_IMAGE, "base64 解码失败") from exc
+        img = decode_image_bytes(raw)
         return raw, img
     assert req.image.path is not None
-    img = load_from_path(req.image.path, ctx.settings.allowed_path_roots)
-    return b"", img
+    return load_from_path(req.image.path, ctx.settings.allowed_path_roots)
 
 
 def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse:
