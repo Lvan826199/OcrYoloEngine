@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-首版骨架已实现(22 个任务全 TDD 完成):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发背压、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁,默认 93 + 真实冒烟 4 个测试全绿。debug 标注图、模型热卸载/重载、Prometheus `/metrics` 等增强已落地。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
+首版骨架 + 全部增强已完成(22 个基础任务 + 首版后增强):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发限流、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁。debug 标注图、模型热卸载/重载、Prometheus `/metrics`、可插拔结果缓存、多方法合并策略等增强已落地。默认 119 + 真实冒烟 5 共 124 个测试全绿,覆盖率 89%。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
 
 ## 文档引用规则（强制）
 
@@ -24,6 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `docs/项目说明.md` | **项目说明 + 文档导航**：流程/核心技术/架构，顶部含 6 文件导航表 |
 | `docs/快速开始.md` | 快速开始(5 分钟)+ 从零开始的小白手把手 |
 | `docs/使用文档.md` | 使用指南：API / CLI / 配置 / 错误码 |
+| `docs/接口集成指南.md` | 平台对接：Python 客户端类 + 所有接口调用代码 + 返回结构速查 |
 | `docs/部署文档.md` | 部署指南：本地 / Docker / 调优 / 安全 |
 | `docs/设计与决策.md` | 设计 spec(需求与架构的权威来源)+ 架构决策记录(ADR/MADR) |
 | `docs/开发说明.md` | **开发主线索引 + 进度表 + 任务清单 + 约定速查**，跨会话接手的第一入口 |

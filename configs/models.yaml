@@ -1,6 +1,40 @@
 # 模型注册表:名称 → 权重路径/版本/类别表
-models: {}
-  # 示例(取消注释并放好权重后启用):
+#
+# 下面的 demo 模型使用仓库自带的 yolov8n 权重(COCO 通用检测,能识别人/车/动物等 80 类),
+# 安装完就能直接试。正式使用时换成你自己训练的模型。
+models:
+  yolov8n:
+    path: yolov8n.pt
+    version: v1
+    classes:
+      0: person
+      1: bicycle
+      2: car
+      3: motorcycle
+      5: bus
+      7: truck
+      14: bird
+      15: cat
+      16: dog
+      24: backpack
+      25: umbrella
+      39: bottle
+      41: cup
+      56: chair
+      57: couch
+      58: potted_plant
+      59: bed
+      60: dining_table
+      62: tv
+      63: laptop
+      64: mouse
+      65: remote
+      66: keyboard
+      67: cell_phone
+      72: refrigerator
+      73: book
+
+  # 你自己的模型（取消注释并改成实际的文件名）:
   # game_a:
   #   path: models_store/game_a.pt
   #   version: v1

@@ -37,7 +37,20 @@
 - 新增**可插拔结果缓存(默认关闭)**:`OYE_RESULT_CACHE_SIZE=0` 时核心管线零开销、行为与现状一致;开启后对相同图 + 参数的请求命中缓存直接返回。支持请求级三模式 `cache`(`auto`/`refresh`/`off`)、`from_cache` 字段与 `X-Cache` 响应头(HIT/MISS/BYPASS)、TTL 过期与 LRU 淘汰;模型 `unload`/`reload` 自动清空缓存;新增指标 `oye_cache_events_total{event="hit|miss"}`。设计见 ADR 0003。
 - 新增 **`/recognize` 可插拔多方法合并策略**:`RecognizeRequest.merge`(`none`/`priority`/`dedup`/`concat`,默认 `none` 即现状,`merged=None`)、`RecognizeResponse.merged` 统一检测列表。`priority` 按 `methods` 顺序命中即停(省后续算力)、`dedup` 跨方法 NMS 去重(IoU ≥ 0.5)、`concat` 按置信度降序汇总;仅 `/recognize` 生效,单方法端点不受影响。与结果缓存兼容(缓存键含 `merge`、`merged` 进缓存,不同策略不串味)。设计见 ADR 0004。
 
+### 修复
+- **本地路径传图绕过文件大小限制**:`load_from_path` 现在返回原始字节用于大小校验,修复了 `OYE_MAX_IMAGE_BYTES` 对本地路径传图无效的问题。
+- **OCR 的 `auto` 设备设置被忽略**:`OYE_DEVICE=auto` 时 OCR 现在正确检测 GPU 可用性,而非始终走 CPU。
+- **OCR 引擎懒加载竞态**:加入双重检查锁,防止并发首次调用时重复创建引擎实例。
+- **base64 图片双重解码浪费**:重构 `_load_bytes_and_image`,base64 只解码一次同时获得原始字节和图像。
+
 ### 变更
 - 文档同步:`项目说明`/`使用文档`/`部署文档`/`开发说明`/`设计与决策` 更新真实数据测试、新端点(`/metrics`、模型热管理)、debug 标注图、Docker(uv)等;去除过时的 fake/计数描述。
+- **全量文档小白友好化改写**:6 个核心文档 + README 全部重写为通俗易懂的简体中文,去除大量专业术语（如 LRU/NMS/IoU/背压/依赖注入/pydantic 等）,改用大白话解释,保持技术准确性。README 路线图更新为实际完成状态。
+- 开发说明新增"需要手动测试的部分"清单,标注出自动化测试无法覆盖的 5 个功能点。
+- **开箱即用体验优化**：`configs/templates.yaml` 预置 `demo_block` 示例模板(指向仓库自带 golden 图片)、`configs/models.yaml` 预置 `yolov8n` 通用检测模型(含 COCO 常用类名),安装完即可发请求验证。
+- **快速开始文档重构**：模板匹配(零额外依赖)替代 OCR 成为首个体验步骤；示例改为跨平台 Python 代码(不再依赖 `base64` shell 命令)；新增 pip 备选安装方案；新增 Python 集成示例。
+- 使用文档加强 `/v1/ocr` 与其他接口请求格式差异的警示。
+- README 使用方法改为 Python 示例 + 模板匹配优先展示。
+- 新增 **接口集成指南**（`docs/接口集成指南.md`）：面向平台对接开发者，包含完整的 Python 客户端类（纯标准库、零额外依赖）、所有接口的调用代码、返回数据结构速查、错误处理与重试策略、完整的业务场景对接示例。
 
 [未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/master...HEAD

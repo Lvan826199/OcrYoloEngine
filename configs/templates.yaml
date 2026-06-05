@@ -1,6 +1,15 @@
 # 模板库:名称 → 模板图路径/版本/匹配参数
-templates: {}
-  # 示例:
+#
+# 下面的 demo 模板使用仓库自带的测试图片,安装完就能直接试,不用另外准备。
+# 正式使用时把你自己的图标截图放到 templates_store/ 目录,再在这里登记。
+templates:
+  demo_block:
+    path: tests/fixtures/golden_patch.png
+    version: v1
+    params:
+      threshold: 0.8
+
+  # 你自己的模板（取消注释并改成实际的文件名）:
   # settings_icon:
   #   path: templates_store/settings.png
   #   version: v1

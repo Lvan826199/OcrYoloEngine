@@ -10,7 +10,7 @@ https://github.com/othneildrew/Best-README-Template
 <h1 align="center">OcrYoloEngine</h1>
 
 <p align="center">
-  面向自动化测试的视觉识别服务:OCR + YOLO + 模板匹配,只识别返回坐标,不执行动作。
+  帮自动化脚本"看懂"截图的服务：文字识别 + 目标检测 + 模板匹配,返回坐标和文字,不执行点击。
   <br />
   <a href="#关于项目"><strong>探索文档 »</strong></a>
   <br />
@@ -23,7 +23,7 @@ https://github.com/othneildrew/Best-README-Template
 <!-- 徽章（占位，待 CI / License 等就绪后替换为真实徽章） -->
 
 ![语言](https://img.shields.io/badge/language-Python-blue)
-![状态](https://img.shields.io/badge/status-WIP-orange)
+![状态](https://img.shields.io/badge/status-Ready-brightgreen)
 ![许可证](https://img.shields.io/badge/license-MIT-green)
 
 </div>
@@ -56,15 +56,17 @@ https://github.com/othneildrew/Best-README-Template
 
 ## 关于项目
 
-`OcrYoloEngine` 是面向**自动化测试**的视觉识别 HTTP 服务。其他自动化脚本在执行时截图,把图片发给本服务,本服务用三种互补手段识别并返回结果(坐标、文字、置信度),**只识别、不执行点击等动作**:
+`OcrYoloEngine` 是帮**自动化测试脚本"看懂"截图**的服务。你的脚本截了图发过来,服务看完告诉你"东西在哪、文字是什么、有多大把握",你的脚本再根据坐标去点击。**只负责看,不负责点**。
 
-- **OCR**(PaddleOCR):文字识别与定位。
-- **YOLO**(ultralytics):目标检测/分类,返回坐标 + 置信度,支持按游戏训练专用模型。
-- **模板匹配**(OpenCV):多尺度模板/图标匹配。
+三种"看图"方式,互相配合:
 
-三种方法统一接口、统一结果结构,调用方拿到全字段后自行筛选。典型场景:手机 App 文字定位、Web 元素定位、手机游戏复杂图像定位。
+- **文字识别（OCR）**:找出图里的文字和位置。
+- **目标检测（YOLO）**:找特定物体（如游戏里的角色、道具），需要提前训练模型。
+- **模板匹配**:按图索骥找固定图标（类似"找不同"）。
 
-> ℹ️ 首版骨架已实现:FastAPI `/v1` 服务 + OCR/YOLO/模板匹配三识别器,统一返回坐标/文字/置信度。模型权重需另行获取并在 `configs/models.yaml` 登记。详见 [开发文档](#开发文档)。
+三种方式用**同一套接口、返回同一种格式**的结果——坐标、文字、把握程度,拿来就能用。
+
+> ℹ️ 首版功能已全部完成:网页接口 + 三种识别 + 结果缓存 + 多方式合并 + 调试标注图 + 监控指标,124 个测试全部通过。目标检测（YOLO）的模型需要自己准备并在 `configs/models.yaml` 登记。详见 [开发文档](#开发文档)。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -86,7 +88,7 @@ https://github.com/othneildrew/Best-README-Template
 
 * Python ≥ 3.11
 * [uv](https://docs.astral.sh/uv/) 包管理器(`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-* 用 YOLO 需自备权重(放 `models_store/` 并在 `configs/models.yaml` 登记);OCR 首次自动下载内置模型
+* 模板匹配开箱即用(自带示例素材);YOLO 自带通用模型 `yolov8n`;OCR 首次使用自动下载内置模型
 
 ### 安装与启动
 
@@ -108,18 +110,32 @@ uv run ocr-yolo serve            # 启动服务,默认 http://0.0.0.0:8000
 
 ## 使用方法
 
-把截图(base64 / 本地路径 / 上传)发给对应接口,拿回坐标与文字。最小示例(文字识别,无需自备模型):
+把截图发给服务,拿回坐标和文字。仓库**自带示例素材**,安装完就能试（模板匹配,不需要额外装大包）:
 
-```sh
-B64=$(base64 -w0 screenshot.png)
-curl -s http://localhost:8000/v1/ocr \
-  -H "Content-Type: application/json" \
-  -d "{\"base64\": \"$B64\"}"
+```python
+import base64, json, urllib.request
+
+with open("tests/fixtures/golden_scene.png", "rb") as f:
+    b64 = base64.b64encode(f.read()).decode()
+
+req = urllib.request.Request(
+    "http://localhost:8000/v1/match",
+    data=json.dumps({
+        "image": {"base64": b64},
+        "methods": ["template"],
+        "templates": ["demo_block"],
+    }).encode(),
+    headers={"Content-Type": "application/json"},
+)
+data = json.loads(urllib.request.urlopen(req).read())
+det = data["method_results"]["template"]["detections"][0]
+print(f"坐标: {det['center']}, 把握: {det['confidence']:.2f}")
+# 输出: 坐标: [90.0, 70.0], 把握: 0.99
 ```
 
-返回 `method_results.ocr.detections` 中每项含 `text`、`confidence`、`bbox`、`center`——`center` 即可点击坐标。
+返回结果里每个识别到的目标都有 `confidence`（把握程度）、`center`（中心点坐标）——**你的脚本直接点 `center` 坐标就行**。
 
-主要接口:`/v1/ocr`(文字)、`/v1/detect`(YOLO)、`/v1/match`(模板)、`/v1/recognize`(多方法合并)、`/v1/recognize/upload`(上传)、`/v1/models`、`/v1/templates`、`/health`、`/ready`。命令行调试:`uv run ocr-yolo infer screenshot.png --methods ocr`。
+主要接口：`/v1/ocr`（文字识别）、`/v1/detect`（目标检测）、`/v1/match`（模板匹配）、`/v1/recognize`（多种方式一起跑）、`/v1/recognize/upload`（文件上传）。命令行调试：`uv run ocr-yolo infer screenshot.png --methods ocr`。
 
 > 全部端点、字段、错误码、配置项见 **[使用文档](docs/使用文档.md)**。
 
@@ -129,9 +145,9 @@ curl -s http://localhost:8000/v1/ocr \
 
 ## 部署
 
-- 本地 / 服务器直跑:`uv run ocr-yolo serve --host 0.0.0.0 --port 8000`(可配 systemd 常驻)。
-- Docker:`docker build -f docker/Dockerfile.cpu -t ocr-yolo:cpu .`(GPU 用 `Dockerfile.gpu`),模型/模板/配置以 volume 挂载。
-- 生产建议开启 API Key(`OYE_API_KEYS`)、限制本地路径白名单(`OYE_ALLOWED_PATH_ROOTS`)。
+- 本地直接跑：`uv run ocr-yolo serve --host 0.0.0.0 --port 8000`（可配成系统服务后台常驻）。
+- Docker：`docker build -f docker/Dockerfile.cpu -t ocr-yolo:cpu .`（有显卡用 `Dockerfile.gpu`），模型/模板/配置用文件夹挂载。
+- 正式环境建议开启密钥验证（`OYE_API_KEYS`）、限制允许读取的目录（`OYE_ALLOWED_PATH_ROOTS`）。
 
 > 完整部署、调优与安全见 **[部署文档](docs/部署文档.md)**。
 
@@ -141,14 +157,15 @@ curl -s http://localhost:8000/v1/ocr \
 
 ## 开发文档
 
-项目的设计与实现细节由 `docs/` 下 6 个文档持续维护，参与开发前请先阅读：
+项目的细节由 `docs/` 下 6 个文档维护：
 
-- 📖 [项目说明](docs/项目说明.md) —— 项目流程、核心技术、架构;顶部含全部文档导航。
-- 🚀 [快速开始](docs/快速开始.md) —— 5 分钟跑起来 + 从零开始的小白手把手。
-- 📚 [使用文档](docs/使用文档.md) —— 全部 API 端点、字段、CLI、配置、错误码。
-- 🚢 [部署文档](docs/部署文档.md) —— 本地 / Docker(CPU/GPU)/ 调优 / 安全。
-- 📐 [设计与决策](docs/设计与决策.md) —— 需求/范围/架构的权威来源 + 架构决策记录(ADR)。
-- 📌 [开发说明](docs/开发说明.md) —— **跨会话接手的第一入口**：文档地图、任务清单/进度表、关键约定速查。
+- [项目说明](docs/项目说明.md) —— 这个服务是干什么的、怎么运转的
+- [快速开始](docs/快速开始.md) —— 5 分钟跑起来 + 完全零基础的手把手教程
+- [使用文档](docs/使用文档.md) —— 所有接口怎么调、命令行、配置、错误码
+- [接口集成指南](docs/接口集成指南.md) —— **平台对接用**：Python 客户端类 + 每个接口的完整代码示例
+- [部署文档](docs/部署文档.md) —— 怎么部署到服务器 / Docker / 性能调优 / 安全
+- [设计与决策](docs/设计与决策.md) —— 技术方案和重要选择的记录
+- [开发说明](docs/开发说明.md) —— 开发进度、约定、任务清单（开发者接手看这个）
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -157,15 +174,15 @@ curl -s http://localhost:8000/v1/ocr \
 ## 路线图
 
 - [x] 搭建项目骨架与依赖管理
-- [x] 接入 YOLO 检测模块（含模型注册表 + 懒加载）
-- [x] 接入 OCR 识别模块（PaddleOCR）
-- [x] 接入模板匹配模块（多尺度 + NMS）
-- [x] 统一识别管线（预处理 / 并发背压 / 坐标回映射）
-- [x] 提供 CLI 与 HTTP API（FastAPI `/v1`）入口
-- [x] 补充测试（单元 + 契约）与文档
-- [ ] 接入真实权重的端到端冒烟测试与 golden 用例
-- [ ] `/recognize` 多方法智能合并、ROI 完整落地、结果缓存
-- [ ] 标注图（debug）输出与 Prometheus 指标端点
+- [x] 接入 YOLO 检测模块（含模型注册表 + 按需加载）
+- [x] 接入 OCR 文字识别模块（PaddleOCR）
+- [x] 接入模板匹配模块（自动缩放 + 去重）
+- [x] 统一识别流程（预处理 / 排队限流 / 坐标换算）
+- [x] 提供命令行与网页接口入口
+- [x] 补充测试（单元 + 接口 + 真实模型冒烟）与文档
+- [x] 真实模型端到端冒烟测试与标准样例回归
+- [x] `/recognize` 多方法合并（优先级/去重/汇总）、区域裁剪、结果缓存
+- [x] 调试标注图输出与运行指标监控端点
 
 详见 [开放的 Issues](https://gitee.com/xiaozai-van-liu/OcrYoloEngine/issues)。
 
