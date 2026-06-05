@@ -14,7 +14,17 @@ from ocr_yolo_engine.settings import Settings
 
 def create_app(ctx: AppContext | None = None, settings: Settings | None = None) -> FastAPI:
     setup_logging()
-    app = FastAPI(title="OcrYoloEngine", version="0.1.0")
+    app = FastAPI(
+        title="OcrYoloEngine",
+        version="0.1.0",
+        description="面向自动化测试的视觉识别服务——截图发过来，返回文字和目标的坐标。",
+        openapi_tags=[
+            {"name": "识别", "description": "核心识别接口：文字识别、目标检测、模板匹配"},
+            {"name": "文件上传", "description": "用文件上传方式（而非 base64）发送图片"},
+            {"name": "资产管理", "description": "查看和管理已登记的模型与模板"},
+            {"name": "运维", "description": "健康检查、就绪检查、运行指标"},
+        ],
+    )
     app.state.ctx = ctx or build_context(settings)
 
     @app.exception_handler(EngineError)
