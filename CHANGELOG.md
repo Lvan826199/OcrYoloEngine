@@ -8,6 +8,7 @@
 ## [未发布]
 
 ### 新增
+- **资产配置改为 `.example` 模板模式**：`configs/models.yaml`、`configs/templates.yaml` 不再入库(改为 gitignore)，改为入库 `*.yaml.example` 模板(含 `yolov8n`/`demo_block` demo)。`config_loader` 在实际文件不存在时**自动回退**读取 `.example`，因此装完仍开箱即用；用户 `cp` 一份改自己的配置则不会与上游冲突、不会误提交。新增 3 个回退测试(默认测试 119→122，共 127 全绿)。
 - 初始化项目脚手架：README、CLAUDE.md、贡献指南、行为准则、许可证、ADR 模板。
 - 视觉识别服务设计文档（spec）与分阶段实现计划。
 - 开发主线文档 `docs/DEVELOPMENT.md`（文档地图 + 进度表 + 约定速查）。
@@ -48,7 +49,7 @@
 - **全量文档小白友好化改写**:6 个核心文档 + README 全部重写为通俗易懂的简体中文,去除大量专业术语（如 LRU/NMS/IoU/背压/依赖注入/pydantic 等）,改用大白话解释,保持技术准确性。README 路线图更新为实际完成状态。
 - 开发说明新增"需要手动测试的部分"清单,标注出自动化测试无法覆盖的 5 个功能点。
 - **文档体系梳理**：消除使用文档、接口集成指南、快速开始之间的大量重复内容。接口集成指南精简为纯代码指南(862→300行)；快速开始合并两个版本为单一流程(403→110行)；各文档职责明确，互相引用而非重复。Swagger `/docs` 页面已有完整中文描述，作为字段参考的权威来源。
-- **开箱即用体验优化**：`configs/templates.yaml` 预置 `demo_block` 示例模板(指向仓库自带 golden 图片)、`configs/models.yaml` 预置 `yolov8n` 通用检测模型(含 COCO 常用类名),安装完即可发请求验证。
+- **开箱即用体验优化**：`configs/templates.yaml.example` 预置 `demo_block` 示例模板(指向仓库自带 golden 图片)、`configs/models.yaml.example` 预置 `yolov8n` 通用检测模型(含 COCO 常用类名),安装完即可发请求验证(靠自动回退读 `.example`)。
 - **快速开始文档重构**：模板匹配(零额外依赖)替代 OCR 成为首个体验步骤；示例改为跨平台 Python 代码(不再依赖 `base64` shell 命令)；新增 pip 备选安装方案；新增 Python 集成示例。
 - 使用文档加强 `/v1/ocr` 与其他接口请求格式差异的警示。
 - README 使用方法改为 Python 示例 + 模板匹配优先展示。

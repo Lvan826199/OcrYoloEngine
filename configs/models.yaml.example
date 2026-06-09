@@ -1,4 +1,9 @@
-# 模型注册表:名称 → 权重路径/版本/类别表
+# 模型注册表（示例模板）
+#
+# 用法：复制本文件为 configs/models.yaml，改成你自己的模型再用：
+#   cp configs/models.yaml.example configs/models.yaml
+# 不复制也能运行——服务会自动回退读取本示例（含下面的 yolov8n demo）。
+# 实际的 configs/models.yaml 已被 git 忽略，改它不会和上游冲突、也不会误提交。
 #
 # 下面的 demo 模型使用仓库自带的 yolov8n 权重(COCO 通用检测,能识别人/车/动物等 80 类),
 # 安装完就能直接试。正式使用时换成你自己训练的模型。

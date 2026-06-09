@@ -25,6 +25,7 @@ env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
 
 # 模型存储目录(保留占位文件,权重仍被忽略)
 models_store/*
@@ -35,5 +36,9 @@ templates_store/*
 # 本地环境变量(保留 .env.example 作为模板)
 .env
 !.env.example
+
+# 资产配置:实际文件由用户从 .example 复制,不入库(保留 .example 模板)
+configs/models.yaml
+configs/templates.yaml
 
 # uv 锁文件纳入版本管理(锁定依赖版本、保证可复现),不忽略

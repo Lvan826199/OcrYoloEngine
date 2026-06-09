@@ -1,4 +1,9 @@
-# 模板库:名称 → 模板图路径/版本/匹配参数
+# 模板库（示例模板）
+#
+# 用法：复制本文件为 configs/templates.yaml，改成你自己的模板再用：
+#   cp configs/templates.yaml.example configs/templates.yaml
+# 不复制也能运行——服务会自动回退读取本示例（含下面的 demo_block）。
+# 实际的 configs/templates.yaml 已被 git 忽略，改它不会和上游冲突、也不会误提交。
 #
 # 下面的 demo 模板使用仓库自带的测试图片,安装完就能直接试,不用另外准备。
 # 正式使用时把你自己的图标截图放到 templates_store/ 目录,再在这里登记。

@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-首版骨架 + 全部增强已完成(22 个基础任务 + 首版后增强):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发限流、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁。debug 标注图、模型热卸载/重载、Prometheus `/metrics`、可插拔结果缓存、多方法合并策略等增强已落地。默认 119 + 真实冒烟 5 共 124 个测试全绿,覆盖率 89%。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记。**
+首版骨架 + 全部增强已完成(22 个基础任务 + 首版后增强):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发限流、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁。debug 标注图、模型热卸载/重载、Prometheus `/metrics`、可插拔结果缓存、多方法合并策略等增强已落地。默认 122 + 真实冒烟 5 共 127 个测试全绿。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记;资产配置采用 `.example` 模板入库 + 实际文件 gitignore + 加载时自动回退读 `.example`(开箱即用且规范)。**
 
 ## 文档引用规则（强制）
 
