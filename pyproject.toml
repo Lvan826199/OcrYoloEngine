@@ -1,6 +1,6 @@
 [project]
 name = "ocr-yolo-engine"
-version = "0.1.0"
+version = "0.2.0"
 description = "面向自动化测试的视觉识别服务:OCR + YOLO + 模板匹配,只做推理返回坐标"
 readme = "README.md"
 requires-python = ">=3.11"

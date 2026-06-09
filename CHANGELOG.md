@@ -7,6 +7,8 @@
 
 ## [未发布]
 
+## [0.2.0] - 2026-06-09
+
 ### 新增
 - **资产配置改为 `.example` 模板模式**：`configs/models.yaml`、`configs/templates.yaml` 不再入库(改为 gitignore)，改为入库 `*.yaml.example` 模板(含 `yolov8n`/`demo_block` demo)。`config_loader` 在实际文件不存在时**自动回退**读取 `.example`，因此装完仍开箱即用；用户 `cp` 一份改自己的配置则不会与上游冲突、不会误提交。新增 3 个回退测试(默认测试 119→122，共 127 全绿)。
 - 初始化项目脚手架：README、CLAUDE.md、贡献指南、行为准则、许可证、ADR 模板。
@@ -58,4 +60,5 @@
 - 启动时打印 `http://localhost:端口/docs` 地址（不再显示 `0.0.0.0`，Windows 浏览器无法访问）。
 - 访问根路径 `/` 自动跳转到 `/docs` 接口文档页面（之前返回 404）。
 
-[未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/master...HEAD
+[未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/v0.2.0...HEAD
+[0.2.0]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/releases/tag/v0.2.0

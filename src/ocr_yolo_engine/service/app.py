@@ -16,7 +16,7 @@ def create_app(ctx: AppContext | None = None, settings: Settings | None = None) 
     setup_logging()
     app = FastAPI(
         title="OcrYoloEngine",
-        version="0.1.0",
+        version="0.2.0",
         description="面向自动化测试的视觉识别服务——截图发过来，返回文字和目标的坐标。",
         openapi_tags=[
             {"name": "识别", "description": "核心识别接口：文字识别、目标检测、模板匹配"},
