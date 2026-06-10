@@ -159,6 +159,104 @@ def test_recognize_multi_method_merge_concat_real():
     assert confs == sorted(confs, reverse=True)
 
 
+def _game_fixture(name: str):
+    """读入库的真实游戏截图样例(来源/许可见 tests/fixtures/README.md)。"""
+    import json
+    from pathlib import Path
+
+    import cv2
+
+    fixtures = Path(__file__).resolve().parent.parent / "fixtures"
+    with (fixtures / f"{name}.expected.json").open(encoding="utf-8") as f:
+        expected = json.load(f)
+    img = cv2.imread(str(fixtures / expected["scene"]), cv2.IMREAD_COLOR)
+    assert img is not None, f"样例图 {expected['scene']} 应可读取"
+    return img, expected
+
+
+def test_ocr_game_race_hud_real():
+    """真实 PaddleOCR 读真实游戏竞速 HUD:计时器/圈数/赛道名,坐标带容差。"""
+    pytest.importorskip("paddleocr")
+    import cv2
+
+    from ocr_yolo_engine.recognizers.ocr import OcrRecognizer
+
+    img, expected = _game_fixture("game_race")
+    rec = OcrRecognizer()
+    try:
+        out = rec.infer(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), InferContext(conf_threshold=0.5))
+    except Exception as exc:  # noqa: BLE001 - 模型下载/联网失败时优雅跳过
+        pytest.skip(f"无法获取 PaddleOCR 模型:{exc}")
+
+    for want in expected["ocr_expected"]:
+        hits = [d for d in out if want["text_contains"] in (d.text or "")]
+        assert hits, f"应识别到含 '{want['text_contains']}' 的文字,实际:{[d.text for d in out]}"
+        d = hits[0]
+        cx = (d.bbox[0] + d.bbox[2]) / 2
+        cy = (d.bbox[1] + d.bbox[3]) / 2
+        tol = want["tolerance_px"]
+        assert abs(cx - want["center"][0]) <= tol
+        assert abs(cy - want["center"][1]) <= tol
+
+
+def test_ocr_game_menu_labels_real():
+    """真实 PaddleOCR 读真实游戏菜单:按钮文字标签应可识别(供文字定位点击)。"""
+    pytest.importorskip("paddleocr")
+    import cv2
+
+    from ocr_yolo_engine.recognizers.ocr import OcrRecognizer
+
+    img, _ = _game_fixture("game_menu")
+    rec = OcrRecognizer()
+    try:
+        out = rec.infer(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), InferContext(conf_threshold=0.5))
+    except Exception as exc:  # noqa: BLE001 - 模型下载/联网失败时优雅跳过
+        pytest.skip(f"无法获取 PaddleOCR 模型:{exc}")
+
+    texts = [(d.text or "") for d in out]
+    for label in ("Story Mode", "Online"):
+        assert any(label in t for t in texts), f"菜单标签 '{label}' 应被识别,实际:{texts}"
+
+
+def test_yolo_game_race_real():
+    """真实 yolov8n 看真实游戏画面:应检出赛道旁的站立角色(person),位置带容差。"""
+    pytest.importorskip("ultralytics")
+
+    from ocr_yolo_engine.models.registry import ModelRegistry, ModelSpec
+    from ocr_yolo_engine.recognizers.yolo import YoloRecognizer, load_yolo_model
+
+    img, expected = _game_fixture("game_race")
+    want = expected["yolo_expected"]
+    registry = ModelRegistry(
+        {
+            want["model"]: ModelSpec(
+                name=want["model"],
+                path=f"{want['model']}.pt",
+                version="v8n",
+                classes={0: "person"},
+            )
+        },
+        loader_fn=load_yolo_model,
+        cache_size=1,
+    )
+    rec = YoloRecognizer(registry=registry)
+    try:
+        out = rec.infer(img, InferContext(conf_threshold=0.25, model=want["model"]))
+    except Exception as exc:  # noqa: BLE001 - 权重下载/联网失败时优雅跳过
+        pytest.skip(f"无法获取 {want['model']} 权重:{exc}")
+
+    persons = [
+        d for d in out if d.label == want["label"] and d.confidence >= want["min_confidence"]
+    ]
+    assert persons, f"应检出 {want['label']},实际:{[(d.label, d.confidence) for d in out]}"
+    tol = want["tolerance_px"]
+    best = max(persons, key=lambda d: d.confidence)
+    cx = (best.bbox[0] + best.bbox[2]) / 2
+    cy = (best.bbox[1] + best.bbox[3]) / 2
+    assert abs(cx - want["center"][0]) <= tol
+    assert abs(cy - want["center"][1]) <= tol
+
+
 def test_template_real_http_e2e():
     """真实 TestClient + 真实模板:无重依赖,完整 HTTP 跑通模板匹配。"""
     from tests.conftest import PATCH_CENTER, SCENE_H, SCENE_W, TEMPLATE_NAME, make_client

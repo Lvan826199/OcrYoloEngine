@@ -1,0 +1,8 @@
+{
+  "scene": "game_menu.png",
+  "scene_size": [1065, 594],
+  "template_crop": { "x": 662, "y": 348, "w": 96, "h": 112 },
+  "center": [710.0, 404.0],
+  "tolerance_px": 3,
+  "min_confidence": 0.99
+}
