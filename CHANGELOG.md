@@ -8,7 +8,7 @@
 ## [未发布]
 
 ### 新增
-- **自定义 YOLO 模型训练端到端教程**：`training/README.md` 重写为完整教程（采集 → 标注 → 组织数据集 → 训练 → 看懂结果 → 上线服务 → 迭代）；新增 `training/make_demo_dataset.py` 零标注合成数据集生成器（5 分钟 demo 通道）。CPU 实测全流程：40 轮训练 2.2 分钟、mAP50 两类均 0.995、自训模型经服务 `/v1/detect` 检出目标坐标偏差 <0.005。`train.py` 修复无 GPU 机器默认参数必崩的问题（默认自动选设备），训练完打印权重路径与上线三步提示。
+- **自定义 YOLO 模型训练端到端教程**：`training/README.md` 重写为完整教程（采集 → 标注 → 组织数据集 → 训练 → 看懂结果 → 上线服务 → 迭代）；新增 `training/make_demo_dataset.py` 零标注合成数据集生成器（5 分钟 demo 通道）。CPU 实测全流程：40 轮训练 2.2 分钟、mAP50 两类均 0.995、自训模型经服务 `/v1/detect` 检出目标坐标偏差 <0.005。`train.py` 修复无 GPU 机器默认参数必崩的问题（默认自动选设备），训练完打印权重路径与上线三步提示。教程含「预标注自举」流程：用第一版模型批量预标注（`yolo predict save_txt`），人工只修不画，实测预标坐标与真值偏差 <0.003。
 - **`X-Request-ID` 响应头**：所有响应（成功与错误）都带该头，与 body 的 `request_id` 一致，便于调用方/网关做日志关联。
 - **JSON 结构化访问日志**：每个请求记一条（method / path / status / elapsed_ms / request_id），与现有 JSON 日志同格式。
 - **夜间真实模型冒烟流水线**：`.github/workflows/smoke.yml` 每日定时 + 手动触发跑 `pytest -m smoke`，缓存 uv 依赖、PaddleOCR 模型与 yolov8n 权重。
