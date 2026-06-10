@@ -16,7 +16,8 @@ from ocr_yolo_engine.preprocessing.pipeline import enforce_byte_limit
 def decode_image_bytes(data: bytes) -> np.ndarray:
     """把图片字节解码为 BGR ndarray;失败抛 INVALID_IMAGE。"""
     arr = np.frombuffer(data, dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    # 显式注解:不同 opencv 发行包的存根对返回值标注不一(Any/ndarray),统一收敛。
+    img: np.ndarray | None = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise EngineError(ErrorCode.INVALID_IMAGE, "无法解码为图片")
     return img

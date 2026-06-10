@@ -7,6 +7,24 @@
 
 ## [未发布]
 
+## [0.2.1] - 2026-06-10
+
+> 全量代码校验后的集中修复批次，过程记录见 `plan/2026-06-10-代码校验修复计划.md` 与 `plan/2026-06-10-bug修复日志.md`。
+
+### 修复
+- **错误响应 `request_id` 恒为 `"-"`**：request_id 改在 async 中间件绑定（线程池里绑定的 contextvar 传不回异常处理器），4xx/5xx 响应现在带真实 request_id，可关联日志排查。
+- **`/v1/recognize/upload` 传非法参数返回裸 500**：非法 `methods`、yolo 缺 `model` 等现在与 JSON 接口一致返回 422 + 校验详情。
+- **指标遗漏失败请求**：超时/过载/识别异常现在记入 `oye_requests_total{status="error"}`，此前只统计成功。
+- **解压炸弹防护**：图片字节上限改在解码前校验（base64 与本地路径两条加载路径），恶意小文件无法再先吃光内存。
+- **模板匹配候选框爆炸**：模板未配置相似度门槛时借用的全局门槛设 0.5 下限 + 每缩放档候选 top-200 截断；显式配置的门槛不受影响。设计见 ADR 0005。
+- **超时后背压失真**：并发槽位改在任务真正结束时归还，超时的僵尸任务不再提前释放名额放新请求涌入。设计见 ADR 0006。
+- **依赖前向兼容**：锁定 `paddleocr>=2.7,<3`（3.x 移除了现用 API，新装环境会启动失败）。
+
+### 变更
+- **性能**：结果缓存键改为哈希原始压缩字节（免去对解码后大数组做 sha256）；模型注册表改 per-name 加载锁（慢加载不再阻塞其他模型取用）；模板匹配（线程安全）不再被模型锁串行；upload 接口消除重复解码；模板灰度图按名缓存。
+- **清理**：移除从未生效的 `OYE_WARMUP` 配置；API Key 改常数时间比较；服务关停时正确关闭推理线程池；JSON 日志增加 UTC 时间戳 `time` 字段；`serve` 在候选端口全被占用时明确报错（此前静默用必然失败的端口）。
+- 测试新增 16 个（默认 122→138，含真实冒烟共 143 个，全部通过）。
+
 ## [0.2.0] - 2026-06-09
 
 ### 新增
@@ -60,5 +78,6 @@
 - 启动时打印 `http://localhost:端口/docs` 地址（不再显示 `0.0.0.0`，Windows 浏览器无法访问）。
 - 访问根路径 `/` 自动跳转到 `/docs` 接口文档页面（之前返回 404）。
 
-[未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/v0.2.0...HEAD
+[未发布]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/v0.2.1...HEAD
+[0.2.1]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/compare/v0.2.0...v0.2.1
 [0.2.0]: https://gitee.com/xiaozai-van-liu/OcrYoloEngine/releases/tag/v0.2.0

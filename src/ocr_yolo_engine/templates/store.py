@@ -45,7 +45,8 @@ class TemplateStore:
         with self._lock:
             if name in self._cache:
                 return self._cache[name]
-            img = cv2.imread(spec.path, cv2.IMREAD_COLOR)
+            # 显式注解:不同 opencv 发行包的存根对返回值标注不一(Any/ndarray)。
+            img: np.ndarray | None = cv2.imread(spec.path, cv2.IMREAD_COLOR)
             if img is None:
                 raise EngineError(
                     ErrorCode.TEMPLATE_NOT_FOUND,
@@ -60,6 +61,6 @@ class TemplateStore:
         with self._lock:
             if name in self._gray_cache:
                 return self._gray_cache[name]
-            gray = cv2.cvtColor(self.get_image(name), cv2.COLOR_BGR2GRAY)
+            gray: np.ndarray = cv2.cvtColor(self.get_image(name), cv2.COLOR_BGR2GRAY)
             self._gray_cache[name] = gray
             return gray

@@ -23,7 +23,7 @@ https://github.com/othneildrew/Best-README-Template
 <!-- 徽章（占位，待 CI / License 等就绪后替换为真实徽章） -->
 
 ![语言](https://img.shields.io/badge/language-Python-blue)
-![版本](https://img.shields.io/badge/version-0.2.0-blue)
+![版本](https://img.shields.io/badge/version-0.2.1-blue)
 ![状态](https://img.shields.io/badge/status-Ready-brightgreen)
 ![许可证](https://img.shields.io/badge/license-MIT-green)
 
@@ -67,7 +67,7 @@ https://github.com/othneildrew/Best-README-Template
 
 三种方式用**同一套接口、返回同一种格式**的结果——坐标、文字、把握程度,拿来就能用。
 
-> ℹ️ 当前版本 **v0.2.0**:网页接口 + 三种识别 + 结果缓存 + 多方式合并 + 调试标注图 + 监控指标,127 个测试全部通过。模板匹配开箱即用(自带示例),YOLO 自带通用模型 `yolov8n`;要用自己的模型/模板时从 `configs/*.yaml.example` 复制一份再改。详见 [开发文档](#开发文档)。
+> ℹ️ 当前版本 **v0.2.1**:网页接口 + 三种识别 + 结果缓存 + 多方式合并 + 调试标注图 + 监控指标,143 个测试全部通过。模板匹配开箱即用(自带示例),YOLO 自带通用模型 `yolov8n`;要用自己的模型/模板时从 `configs/*.yaml.example` 复制一份再改。详见 [开发文档](#开发文档)。
 
 <p align="right">(<a href="#readme-top">回到顶部</a>)</p>
 
@@ -172,7 +172,7 @@ print(f"坐标: {det['center']}, 把握: {det['confidence']:.2f}")
 
 ---
 
-### 已完成（v0.2.0）
+### 已完成（v0.2.1）
 
 - [x] 搭建项目骨架与依赖管理（uv）
 - [x] 接入 YOLO 检测模块（含模型注册表 + 按需加载 + 热卸载/重载）
@@ -180,12 +180,13 @@ print(f"坐标: {det['center']}, 把握: {det['confidence']:.2f}")
 - [x] 接入模板匹配模块（自动缩放 + 去重）
 - [x] 统一识别流程（预处理 / 排队限流 / 坐标换算）
 - [x] 提供命令行与网页接口入口（含端口自动轮询、根路径跳转 `/docs`）
-- [x] 真实模型端到端冒烟测试与标准样例回归（127 个测试全绿）
+- [x] 真实模型端到端冒烟测试与标准样例回归（143 个测试全绿）
 - [x] `/recognize` 多方法合并（优先级/去重/汇总）、区域裁剪、结果缓存
 - [x] 调试标注图输出与 Prometheus 运行指标监控端点
 - [x] CPU/GPU Docker 镜像（uv 构建）与 CI 质量门禁
 - [x] 资产配置 `.example` 模板模式（开箱即用 + 加载自动回退）
 - [x] 全量文档小白友好化 + 平台对接集成指南 + `/docs` 中文接口说明
+- [x] 全量代码校验修复批次：错误响应 request_id、上传接口校验契约、防解压炸弹、模板匹配防爆炸、背压语义、锁粒度与缓存键优化（v0.2.1）
 
 ### 规划中
 

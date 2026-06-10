@@ -21,7 +21,8 @@ class _RawLike(Protocol):
 
 def to_rgb(bgr: np.ndarray) -> np.ndarray:
     """BGR → RGB,内部统一以 RGB 流转。"""
-    return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    rgb: np.ndarray = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    return rgb
 
 
 def enforce_byte_limit(raw_bytes: bytes, *, max_bytes: int) -> None:
