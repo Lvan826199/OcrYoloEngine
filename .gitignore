@@ -42,3 +42,7 @@ configs/models.yaml
 configs/templates.yaml
 
 # uv 锁文件纳入版本管理(锁定依赖版本、保证可复现),不忽略
+
+# 训练产物(教程生成,不入库)
+runs/
+training/demo_dataset/

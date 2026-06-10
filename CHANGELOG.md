@@ -8,18 +8,17 @@
 ## [未发布]
 
 ### 新增
+- **自定义 YOLO 模型训练端到端教程**：`training/README.md` 重写为完整教程（采集 → 标注 → 组织数据集 → 训练 → 看懂结果 → 上线服务 → 迭代）；新增 `training/make_demo_dataset.py` 零标注合成数据集生成器（5 分钟 demo 通道）。CPU 实测全流程：40 轮训练 2.2 分钟、mAP50 两类均 0.995、自训模型经服务 `/v1/detect` 检出目标坐标偏差 <0.005。`train.py` 修复无 GPU 机器默认参数必崩的问题（默认自动选设备），训练完打印权重路径与上线三步提示。
 - **`X-Request-ID` 响应头**：所有响应（成功与错误）都带该头，与 body 的 `request_id` 一致，便于调用方/网关做日志关联。
 - **JSON 结构化访问日志**：每个请求记一条（method / path / status / elapsed_ms / request_id），与现有 JSON 日志同格式。
 - **夜间真实模型冒烟流水线**：`.github/workflows/smoke.yml` 每日定时 + 手动触发跑 `pytest -m smoke`，缓存 uv 依赖、PaddleOCR 模型与 yolov8n 权重。
 - **覆盖率门禁**：`scripts/check.sh` 的测试步骤加 `--cov-fail-under=85`（当前实测 88%），防覆盖率滑坡。
+- **真实游戏截图固定回归**：`tests/fixtures/` 收录开源游戏 SuperTuxKart 的两张真实截图（菜单 + 竞速 HUD，Wikimedia Commons，CC BY-SA 4.0，来源见该目录 README）。默认套件新增"从菜单截图裁真实按钮再找回"的模板匹配回归与防爆炸保护回归；冒烟套件新增真实 PaddleOCR 读 HUD 文字（计时器/圈数/赛道名）、读菜单标签、真实 yolov8n 检出画面角色 3 个用例。测试 143→148（默认 140 + 冒烟 8），全部通过。
 
 ### 变更
 - **expected.json 字段规范**：`tests/fixtures/` 的期望结果文件统一字段结构（`scene`/`scene_size`/`description` + 按方法分组的 `expectations`），3 个既有文件迁移到位；新增 `scripts/gen_expected.py` 对样例图跑真实识别生成期望草稿，保证"期望值出自真实运行"。规范写入 `tests/fixtures/README.md`。
 - **bug 修复日志改为长期文档**：迁移至 `docs/bug修复日志.md`（倒序累积，现象/根因/修法/验证），`plan/` 目录今后只放计划类文档；文档同步策略与 Bug 修复策略正式写入 `CLAUDE.md`。
 - **跨机共享的项目记忆**：新增根目录 `MEMORY.md`（工作偏好 + 跨会话注意事项），由 `CLAUDE.md` 经 `@MEMORY.md` import 自动加载，随 git 在多台电脑间同步。
-
-### 新增
-- **真实游戏截图固定回归**：`tests/fixtures/` 收录开源游戏 SuperTuxKart 的两张真实截图（菜单 + 竞速 HUD，Wikimedia Commons，CC BY-SA 4.0，来源见该目录 README）。默认套件新增"从菜单截图裁真实按钮再找回"的模板匹配回归与防爆炸保护回归；冒烟套件新增真实 PaddleOCR 读 HUD 文字（计时器/圈数/赛道名）、读菜单标签、真实 yolov8n 检出画面角色 3 个用例。测试 143→148（默认 140 + 冒烟 8），全部通过。
 
 ## [0.2.1] - 2026-06-10
 
