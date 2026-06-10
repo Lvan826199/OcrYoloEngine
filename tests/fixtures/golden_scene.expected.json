@@ -1,26 +1,17 @@
 {
-  "scene_size": [
-    160,
-    120
-  ],
-  "template": {
-    "name": "patch",
-    "size": [
-      20,
-      20
+  "scene": "golden_scene.png",
+  "scene_size": [160, 120],
+  "description": "白底 160x120,(80,60) 处 20x20 黑块;模板为同尺寸纯黑块(golden_patch.png)。期望值由真实模板匹配运行得出。",
+  "expectations": {
+    "template": [
+      {
+        "name": "patch",
+        "template_file": "golden_patch.png",
+        "bbox": [80, 60, 100, 80],
+        "center": [90.0, 70.0],
+        "tolerance_px": 3,
+        "min_confidence": 0.6
+      }
     ]
-  },
-  "bbox": [
-    80,
-    60,
-    100,
-    80
-  ],
-  "center": [
-    90.0,
-    70.0
-  ],
-  "tolerance_px": 3,
-  "min_confidence": 0.6,
-  "description": "白底 160x120,(80,60) 处 20x20 黑块;模板为同尺寸纯黑块。"
+  }
 }

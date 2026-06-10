@@ -28,11 +28,12 @@ def _load_expected() -> dict:
 def test_golden_template_match_no_regression():
     """对已入库样例图跑真实模板匹配,bbox/center 在容差内、置信度达下限。"""
     expected = _load_expected()
-    tmpl_name = expected["template"]["name"]
-    tol = expected["tolerance_px"]
-    min_conf = expected["min_confidence"]
+    want = expected["expectations"]["template"][0]
+    tmpl_name = want["name"]
+    tol = want["tolerance_px"]
+    min_conf = want["min_confidence"]
 
-    scene_bgr = cv2.imread(str(_FIXTURES / "golden_scene.png"), cv2.IMREAD_COLOR)
+    scene_bgr = cv2.imread(str(_FIXTURES / expected["scene"]), cv2.IMREAD_COLOR)
     assert scene_bgr is not None, "样例场景图应可读取"
     full_h, full_w = scene_bgr.shape[:2]
     assert [full_w, full_h] == expected["scene_size"]
@@ -41,7 +42,7 @@ def test_golden_template_match_no_regression():
         {
             tmpl_name: TemplateSpec(
                 name=tmpl_name,
-                path=str(_FIXTURES / "golden_patch.png"),
+                path=str(_FIXTURES / want["template_file"]),
                 version="golden-v1",
                 params={"threshold": min_conf},
             )
@@ -59,11 +60,11 @@ def test_golden_template_match_no_regression():
     assert dets, "样例图应稳定检出黑块"
     best = max(dets, key=lambda d: d.confidence)
 
-    ex_bbox = expected["bbox"]
-    for got, want in zip(best.bbox, ex_bbox, strict=True):
-        assert abs(got - want) <= tol, f"bbox {best.bbox} 偏离期望 {ex_bbox} 超过 {tol}px"
+    ex_bbox = want["bbox"]
+    for got, wanted in zip(best.bbox, ex_bbox, strict=True):
+        assert abs(got - wanted) <= tol, f"bbox {best.bbox} 偏离期望 {ex_bbox} 超过 {tol}px"
 
-    ex_center = expected["center"]
+    ex_center = want["center"]
     assert abs(best.center[0] - ex_center[0]) <= tol
     assert abs(best.center[1] - ex_center[1]) <= tol
 

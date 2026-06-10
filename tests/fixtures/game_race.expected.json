@@ -1,17 +1,22 @@
 {
   "scene": "game_race.jpg",
   "scene_size": [1366, 768],
-  "ocr_expected": [
-    { "text_contains": "00:01.53", "center": [1254, 38], "tolerance_px": 15 },
-    { "text_contains": "1/3", "center": [1314, 112], "tolerance_px": 15 },
-    { "text_contains": "Cocoa River", "center": [703, 687], "tolerance_px": 15 },
-    { "text_contains": "by Ozoneone", "center": [703, 726], "tolerance_px": 15 }
-  ],
-  "yolo_expected": {
-    "model": "yolov8n",
-    "label": "person",
-    "center": [1106, 281],
-    "tolerance_px": 40,
-    "min_confidence": 0.5
+  "description": "SuperTuxKart 竞速 HUD:计时器/圈数/赛道名文字 + 赛道旁站立角色。期望值由真实 PaddleOCR 与真实 yolov8n 推理得出(2026-06-10,转码后 JPEG 复核)。",
+  "expectations": {
+    "ocr": [
+      { "text_contains": "00:01.53", "center": [1254, 38], "tolerance_px": 15 },
+      { "text_contains": "1/3", "center": [1314, 112], "tolerance_px": 15 },
+      { "text_contains": "Cocoa River", "center": [703, 687], "tolerance_px": 15 },
+      { "text_contains": "by Ozoneone", "center": [703, 726], "tolerance_px": 15 }
+    ],
+    "yolo": [
+      {
+        "model": "yolov8n",
+        "label": "person",
+        "center": [1106, 281],
+        "tolerance_px": 40,
+        "min_confidence": 0.5
+      }
+    ]
   }
 }

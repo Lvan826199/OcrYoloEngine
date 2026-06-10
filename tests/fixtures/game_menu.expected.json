@@ -1,8 +1,16 @@
 {
   "scene": "game_menu.png",
   "scene_size": [1065, 594],
-  "template_crop": { "x": 662, "y": 348, "w": 96, "h": 112 },
-  "center": [710.0, 404.0],
-  "tolerance_px": 3,
-  "min_confidence": 0.99
+  "description": "SuperTuxKart 主菜单;模板为从本图 (662,348) 裁出的 96x112 Online 地球按钮,期望在原位精确找回。期望值由真实模板匹配运行得出(真命中 conf=1.000)。",
+  "expectations": {
+    "template": [
+      {
+        "name": "game_button",
+        "crop": { "x": 662, "y": 348, "w": 96, "h": 112 },
+        "center": [710.0, 404.0],
+        "tolerance_px": 3,
+        "min_confidence": 0.99
+      }
+    ]
+  }
 }

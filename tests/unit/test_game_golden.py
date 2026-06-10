@@ -34,14 +34,15 @@ def _build_store(tmp_path: Path, expected: dict, params: dict) -> tuple[Template
     h, w = scene.shape[:2]
     assert [w, h] == expected["scene_size"]
 
-    crop = expected["template_crop"]
+    want = expected["expectations"]["template"][0]
+    crop = want["crop"]
     tpl = scene[crop["y"] : crop["y"] + crop["h"], crop["x"] : crop["x"] + crop["w"]]
-    tpl_path = tmp_path / "game_button.png"
+    tpl_path = tmp_path / f"{want['name']}.png"
     assert cv2.imwrite(str(tpl_path), tpl)
     store = TemplateStore(
         {
-            "game_button": TemplateSpec(
-                name="game_button", path=str(tpl_path), version="v1", params=params
+            want["name"]: TemplateSpec(
+                name=want["name"], path=str(tpl_path), version="v1", params=params
             )
         }
     )
@@ -55,21 +56,22 @@ def test_game_menu_button_template_match(tmp_path):
     与"长得有点像"的区域拉开——这也是使用文档建议的模板配置方式。
     """
     expected = _load_expected()
+    want = expected["expectations"]["template"][0]
     store, scene = _build_store(tmp_path, expected, params={"threshold": 0.97})
     recognizer = TemplateRecognizer(store=store)
 
     full_h, full_w = scene.shape[:2]
     raws = recognizer.infer(
-        to_rgb(scene), InferContext(conf_threshold=0.25, templates=["game_button"])
+        to_rgb(scene), InferContext(conf_threshold=0.25, templates=[want["name"]])
     )
     dets = finalize_detections(list(raws), offset=(0, 0), full_w=full_w, full_h=full_h)
 
     assert dets, "应在菜单截图中找回裁出的按钮"
     best = max(dets, key=lambda d: d.confidence)
-    tol = expected["tolerance_px"]
-    assert abs(best.center[0] - expected["center"][0]) <= tol
-    assert abs(best.center[1] - expected["center"][1]) <= tol
-    assert best.confidence >= expected["min_confidence"]
+    tol = want["tolerance_px"]
+    assert abs(best.center[0] - want["center"][0]) <= tol
+    assert abs(best.center[1] - want["center"][1]) <= tol
+    assert best.confidence >= want["min_confidence"]
 
 
 def test_game_menu_template_fallback_is_bounded(tmp_path):
@@ -79,12 +81,13 @@ def test_game_menu_template_fallback_is_bounded(tmp_path):
     且最高分仍是真命中位置(防护不伤正确性)。
     """
     expected = _load_expected()
+    want = expected["expectations"]["template"][0]
     store, scene = _build_store(tmp_path, expected, params={})
     recognizer = TemplateRecognizer(store=store)
 
     started = time.perf_counter()
     raws = recognizer.infer(
-        to_rgb(scene), InferContext(conf_threshold=0.25, templates=["game_button"])
+        to_rgb(scene), InferContext(conf_threshold=0.25, templates=[want["name"]])
     )
     elapsed = time.perf_counter() - started
 
@@ -93,6 +96,6 @@ def test_game_menu_template_fallback_is_bounded(tmp_path):
     best = max(raws, key=lambda d: d.confidence)
     cx = (best.bbox[0] + best.bbox[2]) / 2
     cy = (best.bbox[1] + best.bbox[3]) / 2
-    tol = expected["tolerance_px"]
-    assert abs(cx - expected["center"][0]) <= tol
-    assert abs(cy - expected["center"][1]) <= tol
+    tol = want["tolerance_px"]
+    assert abs(cx - want["center"][0]) <= tol
+    assert abs(cy - want["center"][1]) <= tol

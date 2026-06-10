@@ -188,7 +188,7 @@ def test_ocr_game_race_hud_real():
     except Exception as exc:  # noqa: BLE001 - 模型下载/联网失败时优雅跳过
         pytest.skip(f"无法获取 PaddleOCR 模型:{exc}")
 
-    for want in expected["ocr_expected"]:
+    for want in expected["expectations"]["ocr"]:
         hits = [d for d in out if want["text_contains"] in (d.text or "")]
         assert hits, f"应识别到含 '{want['text_contains']}' 的文字,实际:{[d.text for d in out]}"
         d = hits[0]
@@ -226,7 +226,7 @@ def test_yolo_game_race_real():
     from ocr_yolo_engine.recognizers.yolo import YoloRecognizer, load_yolo_model
 
     img, expected = _game_fixture("game_race")
-    want = expected["yolo_expected"]
+    want = expected["expectations"]["yolo"][0]
     registry = ModelRegistry(
         {
             want["model"]: ModelSpec(
