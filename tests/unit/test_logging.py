@@ -29,3 +29,13 @@ def test_json_formatter_includes_request_id():
     assert payload["message"] == "hello world"
     assert payload["request_id"] == "req-xyz"
     assert payload["level"] == "INFO"
+
+
+def test_json_formatter_includes_utc_timestamp():
+    """日志必须带时间戳(ISO8601 UTC),否则生产排查无法对时间线。"""
+    record = logging.LogRecord("t", logging.INFO, __file__, 1, "hi", (), None)
+    payload = json.loads(JsonFormatter().format(record))
+    assert "time" in payload
+    # ISO8601 且为 UTC(以 +00:00 结尾)。
+    assert payload["time"].endswith("+00:00")
+    assert payload["time"][:4].isdigit()

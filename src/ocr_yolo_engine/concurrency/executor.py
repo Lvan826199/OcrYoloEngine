@@ -29,19 +29,26 @@ class InferenceExecutor:
                 self._model_locks[key] = threading.Lock()
             return self._model_locks[key]
 
-    def submit(self, model_key: str, fn: Callable[[], T]) -> T:
+    def submit(self, model_key: str, fn: Callable[[], T], serialize: bool = True) -> T:
+        """提交推理任务。serialize=False 时跳过模型锁(任务自身线程安全,如模板匹配)。"""
         if not self._slots.acquire(blocking=False):
             raise EngineError(
                 ErrorCode.OVERLOADED, "服务繁忙,请稍后重试", details={"retry_after": 1}
             )
-        lock = self._model_lock(model_key)
+        task: Callable[[], T]
+        if serialize:
+            lock = self._model_lock(model_key)
 
-        def guarded() -> T:
-            with lock:
-                return fn()
+            def guarded() -> T:
+                with lock:
+                    return fn()
+
+            task = guarded
+        else:
+            task = fn
 
         try:
-            future = self._pool.submit(guarded)
+            future = self._pool.submit(task)
         except BaseException:
             self._slots.release()
             raise

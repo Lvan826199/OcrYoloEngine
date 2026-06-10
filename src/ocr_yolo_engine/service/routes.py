@@ -26,9 +26,14 @@ def _ctx(request: Request) -> AppContext:
     return cast(AppContext, request.app.state.ctx)
 
 
-def _run(request: Request, req: RecognizeRequest, response: Response) -> RecognizeResponse:
+def _run(
+    request: Request,
+    req: RecognizeRequest,
+    response: Response,
+    preloaded: tuple[bytes, Any] | None = None,
+) -> RecognizeResponse:
     ctx = _ctx(request)
-    result = run_recognition(ctx, req)
+    result = run_recognition(ctx, req, preloaded=preloaded)
     # X-Cache 头:缓存关闭或本次 off → BYPASS;命中 → HIT;算了且缓存开 → MISS。
     if ctx.settings.result_cache_size == 0 or req.cache == "off":
         response.headers["X-Cache"] = "BYPASS"
@@ -123,7 +128,7 @@ async def recognize_upload(
     ),
 ) -> RecognizeResponse:
     data = await file.read()
-    decode_image_bytes(data)  # 校验可解码,失败抛 INVALID_IMAGE
+    img = decode_image_bytes(data)  # 解码一次,失败抛 INVALID_IMAGE;结果直接传给管线复用
     b64 = base64.b64encode(data).decode()
     method_list: list[Method] = [m.strip() for m in methods.split(",") if m.strip()]  # type: ignore[misc]
     template_list = [t.strip() for t in templates.split(",")] if templates else None
@@ -139,7 +144,7 @@ async def recognize_upload(
         # 手工构造模型的校验失败不会被 FastAPI 自动接管,
         # 显式转成 RequestValidationError,与 JSON 接口一样返回 422。
         raise RequestValidationError(exc.errors()) from exc
-    return _run(request, req, response)
+    return _run(request, req, response, preloaded=(data, img))
 
 
 @router.get(

@@ -8,7 +8,7 @@ import numpy as np
 
 from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.models.registry import ModelSpec
-from ocr_yolo_engine.recognizers.base import InferContext, RawDetection
+from ocr_yolo_engine.recognizers.base import InferContext, RawDetection, Recognizer
 
 
 class _RegistryLike(Protocol):
@@ -16,7 +16,7 @@ class _RegistryLike(Protocol):
     def spec(self, name: str) -> ModelSpec: ...
 
 
-class YoloRecognizer:
+class YoloRecognizer(Recognizer):
     def __init__(self, registry: _RegistryLike) -> None:
         self._registry = registry
 

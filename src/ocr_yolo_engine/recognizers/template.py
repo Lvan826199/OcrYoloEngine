@@ -7,7 +7,7 @@ from typing import Protocol
 import cv2
 import numpy as np
 
-from ocr_yolo_engine.recognizers.base import InferContext, RawDetection
+from ocr_yolo_engine.recognizers.base import InferContext, RawDetection, Recognizer
 from ocr_yolo_engine.templates.store import TemplateSpec
 
 Box = tuple[float, float, float, float, float]  # x1,y1,x2,y2,score
@@ -20,7 +20,7 @@ MAX_CANDIDATES_PER_SCALE = 200
 
 
 class _StoreLike(Protocol):
-    def get_image(self, name: str) -> np.ndarray: ...
+    def get_gray(self, name: str) -> np.ndarray: ...
     def spec(self, name: str) -> TemplateSpec: ...
 
 
@@ -47,7 +47,10 @@ def non_max_suppression(boxes: list[Box], iou_threshold: float) -> list[Box]:
     return kept
 
 
-class TemplateRecognizer:
+class TemplateRecognizer(Recognizer):
+    # 纯 OpenCV 计算,线程安全,无需按模型锁串行。
+    requires_serial_inference = False
+
     def __init__(
         self,
         store: _StoreLike,
@@ -69,7 +72,7 @@ class TemplateRecognizer:
                 if configured is not None
                 else max(ctx.conf_threshold, MIN_FALLBACK_THRESHOLD)
             )
-            tmpl = cv2.cvtColor(self._store.get_image(name), cv2.COLOR_BGR2GRAY)
+            tmpl = self._store.get_gray(name)
             boxes: list[Box] = []
             for scale in self._scales:
                 th, tw = int(tmpl.shape[0] * scale), int(tmpl.shape[1] * scale)

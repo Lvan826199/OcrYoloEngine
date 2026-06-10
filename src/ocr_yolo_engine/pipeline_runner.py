@@ -66,9 +66,14 @@ def _load_bytes_and_image(ctx: AppContext, req: RecognizeRequest) -> tuple[bytes
     return load_from_path(req.image.path, ctx.settings.allowed_path_roots, max_bytes=max_bytes)
 
 
-def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse:
+def run_recognition(
+    ctx: AppContext,
+    req: RecognizeRequest,
+    preloaded: tuple[bytes, np.ndarray] | None = None,
+) -> RecognizeResponse:
+    """执行识别。preloaded=(原始字节, BGR 图) 时跳过加载解码(上传接口已解码,免重复)。"""
     request_id = current_request_id()
-    raw_bytes, bgr = _load_bytes_and_image(ctx, req)
+    raw_bytes, bgr = preloaded if preloaded is not None else _load_bytes_and_image(ctx, req)
     enforce_limits(
         raw_bytes,
         bgr,
@@ -79,7 +84,7 @@ def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse
 
     # 结果缓存守卫(外挂,不改核心计算):仅在缓存开启且非 off、非 debug 时生效。
     cache_on = ctx.settings.result_cache_size > 0 and req.cache != "off" and not req.debug
-    key = compute_cache_key(bgr, req) if cache_on else None
+    key = compute_cache_key(raw_bytes, req) if cache_on else None
     # 读:仅 auto 模式读缓存(refresh 强制重算)。
     if cache_on and key is not None and req.cache == "auto":
         hit = ctx.cache.get(key)
@@ -159,11 +164,13 @@ def _run_single_method(
     model_key = req.model if method == "yolo" and req.model else method
     started = time.perf_counter()
 
-    def _infer(r: object = recognizer) -> list[RawDetection]:
-        return r.infer(cropped, infer_ctx)  # type: ignore[attr-defined, no-any-return]
+    def _infer() -> list[RawDetection]:
+        return recognizer.infer(cropped, infer_ctx)
 
     try:
-        raws = ctx.executor.submit(model_key, _infer)
+        raws = ctx.executor.submit(
+            model_key, _infer, serialize=recognizer.requires_serial_inference
+        )
     except Exception:
         # 失败(超时/过载/识别器异常)同样要进指标,否则 status="error" 永不出现。
         metrics.record(method, (time.perf_counter() - started) * 1000, ok=False)

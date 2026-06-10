@@ -1,7 +1,7 @@
 """可插拔结果缓存:Null(关闭态)/ 线程安全有界 LRU(可选 TTL),以及缓存键计算。
 
 设计原则:核心管线在 result_cache_size=0 时零开销——连缓存键(哈希)都不计算。
-缓存键以"解码后的图像数组字节 + 规范化请求参数"算 sha256,兼容 base64/path 各来源。
+缓存键以"原始图片字节(压缩态) + 规范化请求参数"算 sha256,兼容 base64/path 各来源。
 """
 
 from __future__ import annotations
@@ -13,8 +13,6 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Protocol
-
-import numpy as np
 
 from ocr_yolo_engine.schemas import Detection, Method, MethodResult, RecognizeRequest
 
@@ -94,15 +92,19 @@ class LruResultCache:
             self._store.clear()
 
 
-def compute_cache_key(image_bgr: np.ndarray, req: RecognizeRequest) -> str:
-    """以解码后的图像数组字节 + 规范化请求参数算 sha256,作为稳定缓存键。
+def compute_cache_key(image_bytes: bytes, req: RecognizeRequest) -> str:
+    """以原始图片字节(压缩态)+ 规范化请求参数算 sha256,作为稳定缓存键。
+
+    哈希压缩字节而非解码后数组:同样的输入字节必然解码出同一张图,语义等价,
+    但哈希量小一个量级(4K PNG 数 MB vs 解码后约 48MB)。代价是同图不同编码
+    不共享缓存条目——只是少一次命中机会,正确性不受影响。
 
     规范化:methods 排序、model、templates 排序、有效 conf_threshold(None 原样)、
     roi 的 model_dump、merge 策略。cache/debug 不参与键计算
     (它们决定是否读写缓存,而非结果本身)。merge 改变输出,必须入键以免串味。
     """
     hasher = hashlib.sha256()
-    hasher.update(image_bgr.tobytes())
+    hasher.update(image_bytes)
 
     params: dict[str, object] = {
         "methods": sorted(req.methods),

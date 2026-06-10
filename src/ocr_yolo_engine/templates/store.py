@@ -24,6 +24,7 @@ class TemplateStore:
     def __init__(self, specs: dict[str, TemplateSpec]) -> None:
         self._specs = specs
         self._cache: dict[str, np.ndarray] = {}
+        self._gray_cache: dict[str, np.ndarray] = {}
         self._lock = threading.RLock()
 
     def spec(self, name: str) -> TemplateSpec:
@@ -53,3 +54,12 @@ class TemplateStore:
                 )
             self._cache[name] = img
             return img
+
+    def get_gray(self, name: str) -> np.ndarray:
+        """模板灰度图,按名缓存:模板匹配每次请求都用,避免重复转换。"""
+        with self._lock:
+            if name in self._gray_cache:
+                return self._gray_cache[name]
+            gray = cv2.cvtColor(self.get_image(name), cv2.COLOR_BGR2GRAY)
+            self._gray_cache[name] = gray
+            return gray

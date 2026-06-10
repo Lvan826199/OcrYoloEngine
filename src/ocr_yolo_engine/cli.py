@@ -24,8 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _find_free_port(host: str, start: int, max_tries: int = 10) -> int:
-    """从 start 开始找一个没被占用的端口,最多尝试 max_tries 个。"""
+def _find_free_port(host: str, start: int, max_tries: int = 10) -> int | None:
+    """从 start 开始找一个没被占用的端口,最多尝试 max_tries 个;都被占返回 None。"""
     import socket
 
     for offset in range(max_tries):
@@ -36,7 +36,7 @@ def _find_free_port(host: str, start: int, max_tries: int = 10) -> int:
                 return port
             except OSError:
                 continue
-    return start
+    return None
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -45,6 +45,9 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     from ocr_yolo_engine.service.app import create_app
 
     port = _find_free_port(args.host, args.port)
+    if port is None:
+        print(f"端口 {args.port} 起的 10 个端口都被占用，请用 --port 指定其他端口", file=sys.stderr)
+        return 1
     if port != args.port:
         print(f"端口 {args.port} 已被占用，自动切换到 {port}")
     browse_host = "localhost" if args.host == "0.0.0.0" else args.host

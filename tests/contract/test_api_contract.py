@@ -166,6 +166,24 @@ def test_upload_invalid_methods_returns_422_not_500(client):
     assert r.status_code == 422
 
 
+def test_upload_template_match_end_to_end(client):
+    """upload 成功路径端到端:真实场景 PNG 上传 + 模板匹配,检出目标且坐标正确。"""
+    img = make_scene_with_patch(SCENE_W, SCENE_H, (30, 40, 12, 12))
+    ok, buf = cv2.imencode(".png", img)
+    assert ok
+    r = client.post(
+        "/v1/recognize/upload",
+        files={"file": ("scene.png", buf.tobytes(), "image/png")},
+        data={"methods": "template", "templates": TEMPLATE_NAME},
+    )
+    assert r.status_code == 200
+    dets = r.json()["method_results"]["template"]["detections"]
+    assert dets, "上传场景含目标,应检出"
+    cx, cy = dets[0]["center"]
+    assert abs(cx - PATCH_CENTER[0]) <= 3
+    assert abs(cy - PATCH_CENTER[1]) <= 3
+
+
 def test_upload_yolo_without_model_returns_422(client):
     """upload methods=yolo 缺 model:与 JSON 接口一致返回 422。"""
     ok, buf = cv2.imencode(".png", np.zeros((10, 10, 3), dtype=np.uint8))

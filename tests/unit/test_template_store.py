@@ -23,6 +23,19 @@ def test_get_loads_and_caches(tmp_path):
     assert img1.shape == (6, 6, 3)
 
 
+def test_get_gray_caches_and_matches_color(tmp_path):
+    """灰度图按名缓存(同对象),内容等于彩色图的灰度转换。"""
+    p = tmp_path / "icon.png"
+    _write_png(p)
+    store = TemplateStore({"icon": TemplateSpec(name="icon", path=str(p), version="v1", params={})})
+    g1 = store.get_gray("icon")
+    g2 = store.get_gray("icon")
+    assert g1 is g2
+    assert g1.ndim == 2
+    expected = cv2.cvtColor(store.get_image("icon"), cv2.COLOR_BGR2GRAY)
+    assert np.array_equal(g1, expected)
+
+
 def test_get_unknown_raises(tmp_path):
     store = TemplateStore({})
     with pytest.raises(EngineError) as ei:

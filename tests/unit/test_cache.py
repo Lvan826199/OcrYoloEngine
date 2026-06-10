@@ -73,61 +73,63 @@ def test_lru_ttl_expiry():
     assert c.get("a") is None  # 已过期
 
 
-def _decode(b64: str) -> np.ndarray:
-    raw = base64.b64decode(b64)
-    return cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+def _png_bytes(img: np.ndarray) -> bytes:
+    ok, buf = cv2.imencode(".png", img)
+    assert ok
+    return buf.tobytes()
 
 
 def _b64_of(img: np.ndarray) -> str:
-    ok, buf = cv2.imencode(".png", img)
-    assert ok
-    return base64.b64encode(buf.tobytes()).decode()
+    return base64.b64encode(_png_bytes(img)).decode()
 
 
 def test_cache_key_stable_for_same_image_and_params():
     img = np.full((20, 20, 3), 128, dtype=np.uint8)
-    b64 = _b64_of(img)
-    bgr = _decode(b64)
-    req = RecognizeRequest(image=ImageInput(base64=b64), methods=["template"], templates=["patch"])
-    k1 = compute_cache_key(bgr, req)
-    k2 = compute_cache_key(bgr, req)
+    raw = _png_bytes(img)
+    req = RecognizeRequest(
+        image=ImageInput(base64=_b64_of(img)), methods=["template"], templates=["patch"]
+    )
+    k1 = compute_cache_key(raw, req)
+    k2 = compute_cache_key(raw, req)
     assert k1 == k2
 
 
 def test_cache_key_differs_for_different_params():
     img = np.full((20, 20, 3), 128, dtype=np.uint8)
+    raw = _png_bytes(img)
     b64 = _b64_of(img)
-    bgr = _decode(b64)
     req_a = RecognizeRequest(
         image=ImageInput(base64=b64), methods=["template"], templates=["patch"]
     )
     req_b = RecognizeRequest(
         image=ImageInput(base64=b64), methods=["template"], templates=["other"]
     )
-    assert compute_cache_key(bgr, req_a) != compute_cache_key(bgr, req_b)
+    assert compute_cache_key(raw, req_a) != compute_cache_key(raw, req_b)
 
 
 def test_cache_key_differs_for_different_image():
-    b64_a = _b64_of(np.full((20, 20, 3), 100, dtype=np.uint8))
-    b64_b = _b64_of(np.full((20, 20, 3), 200, dtype=np.uint8))
+    img_a = np.full((20, 20, 3), 100, dtype=np.uint8)
+    img_b = np.full((20, 20, 3), 200, dtype=np.uint8)
     req_a = RecognizeRequest(
-        image=ImageInput(base64=b64_a), methods=["template"], templates=["patch"]
+        image=ImageInput(base64=_b64_of(img_a)), methods=["template"], templates=["patch"]
     )
     req_b = RecognizeRequest(
-        image=ImageInput(base64=b64_b), methods=["template"], templates=["patch"]
+        image=ImageInput(base64=_b64_of(img_b)), methods=["template"], templates=["patch"]
     )
-    assert compute_cache_key(_decode(b64_a), req_a) != compute_cache_key(_decode(b64_b), req_b)
+    assert compute_cache_key(_png_bytes(img_a), req_a) != compute_cache_key(
+        _png_bytes(img_b), req_b
+    )
 
 
 def test_cache_key_ignores_cache_mode():
     # cache 模式不应影响键(它决定读写策略,不决定结果)。
     img = np.full((20, 20, 3), 128, dtype=np.uint8)
+    raw = _png_bytes(img)
     b64 = _b64_of(img)
-    bgr = _decode(b64)
     req_auto = RecognizeRequest(
         image=ImageInput(base64=b64), methods=["template"], templates=["patch"], cache="auto"
     )
     req_refresh = RecognizeRequest(
         image=ImageInput(base64=b64), methods=["template"], templates=["patch"], cache="refresh"
     )
-    assert compute_cache_key(bgr, req_auto) == compute_cache_key(bgr, req_refresh)
+    assert compute_cache_key(raw, req_auto) == compute_cache_key(raw, req_refresh)

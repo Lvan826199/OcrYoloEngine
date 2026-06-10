@@ -33,7 +33,6 @@ class Settings(BaseSettings):
 
     allowed_path_roots: list[str] = Field(default_factory=list)
     api_keys: list[str] = Field(default_factory=list)
-    warmup: bool = True
 
     @property
     def auth_enabled(self) -> bool:

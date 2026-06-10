@@ -13,7 +13,6 @@ def test_defaults_match_spec():
     assert s.max_image_pixels == 4096 * 4096
     assert s.allowed_path_roots == []
     assert s.api_keys == []
-    assert s.warmup is True
 
 
 def test_env_override(monkeypatch):

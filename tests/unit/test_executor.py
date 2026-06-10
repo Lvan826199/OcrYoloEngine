@@ -83,6 +83,31 @@ def test_timeout_raises_504():
     ex.shutdown()
 
 
+def test_non_serialized_tasks_run_concurrently():
+    """serialize=False(线程安全识别器,如模板匹配):同 key 任务应真并发。
+
+    用 Barrier 证明两个任务同时在跑——若仍被模型锁串行,Barrier 等待会超时。
+    """
+    ex = InferenceExecutor(max_workers=2, max_queue=4, timeout_s=5)
+    barrier = threading.Barrier(2, timeout=2)
+
+    def work():
+        barrier.wait()
+        return True
+
+    results = []
+    threads = [
+        threading.Thread(target=lambda: results.append(ex.submit("same", work, serialize=False)))
+        for _ in range(2)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert results == [True, True]
+    ex.shutdown()
+
+
 def test_timeout_zombie_keeps_slot_until_task_ends():
     """超时返回 504 后任务线程仍在跑(僵尸):槽位在任务真正结束前不归还。
 

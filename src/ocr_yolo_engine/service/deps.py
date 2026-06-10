@@ -8,6 +8,7 @@ from ocr_yolo_engine.cache import LruResultCache, NullResultCache, ResultCache
 from ocr_yolo_engine.concurrency.executor import InferenceExecutor
 from ocr_yolo_engine.config_loader import load_model_specs, load_template_specs
 from ocr_yolo_engine.models.registry import ModelRegistry
+from ocr_yolo_engine.recognizers.base import Recognizer
 from ocr_yolo_engine.recognizers.ocr import OcrRecognizer
 from ocr_yolo_engine.recognizers.template import TemplateRecognizer
 from ocr_yolo_engine.recognizers.yolo import YoloRecognizer, load_yolo_model
@@ -22,7 +23,7 @@ class AppContext:
     registry: ModelRegistry
     template_store: TemplateStore
     executor: InferenceExecutor
-    recognizers: dict[Method, object]
+    recognizers: dict[Method, Recognizer]
     # 结果缓存:默认 Null(关闭),确保手工构造 AppContext 的现有测试不破。
     cache: ResultCache = field(default_factory=NullResultCache)
 
@@ -40,7 +41,7 @@ def build_context(settings: Settings | None = None) -> AppContext:
         max_queue=settings.max_queue,
         timeout_s=settings.request_timeout_s,
     )
-    recognizers: dict[Method, object] = {
+    recognizers: dict[Method, Recognizer] = {
         "ocr": OcrRecognizer(settings=settings),
         "yolo": YoloRecognizer(registry=registry),
         "template": TemplateRecognizer(store=template_store),

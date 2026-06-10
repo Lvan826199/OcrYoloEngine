@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from fastapi import Header, HTTPException, Request
 
 from ocr_yolo_engine.settings import Settings, get_settings
@@ -10,7 +12,10 @@ from ocr_yolo_engine.settings import Settings, get_settings
 def verify_api_key(provided: str | None, settings: Settings) -> None:
     if not settings.auth_enabled:
         return
-    if provided is None or provided not in settings.api_keys:
+    # compare_digest:常数时间比较,避免计时侧信道猜测 key。
+    if provided is None or not any(
+        secrets.compare_digest(provided, key) for key in settings.api_keys
+    ):
         raise HTTPException(status_code=401, detail="无效或缺失的 API Key")
 
 

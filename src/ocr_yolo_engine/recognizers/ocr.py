@@ -7,11 +7,11 @@ from typing import Any
 
 import numpy as np
 
-from ocr_yolo_engine.recognizers.base import InferContext, RawDetection
+from ocr_yolo_engine.recognizers.base import InferContext, RawDetection, Recognizer
 from ocr_yolo_engine.settings import Settings, get_settings
 
 
-class OcrRecognizer:
+class OcrRecognizer(Recognizer):
     def __init__(self, engine: Any | None = None, settings: Settings | None = None) -> None:
         self._engine = engine
         self._settings = settings or get_settings()

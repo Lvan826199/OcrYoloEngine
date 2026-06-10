@@ -6,6 +6,7 @@ import json
 import logging
 import uuid
 from contextvars import ContextVar, Token
+from datetime import UTC, datetime
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
 
@@ -25,6 +26,9 @@ def current_request_id() -> str:
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
+            "time": datetime.fromtimestamp(record.created, tz=UTC).isoformat(
+                timespec="milliseconds"
+            ),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

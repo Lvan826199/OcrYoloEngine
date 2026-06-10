@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -21,7 +22,15 @@ from ocr_yolo_engine.settings import Settings
 
 def create_app(ctx: AppContext | None = None, settings: Settings | None = None) -> FastAPI:
     setup_logging()
+
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        # 服务停止时关停推理线程池,不留孤儿线程。
+        app.state.ctx.executor.shutdown()
+
     app = FastAPI(
+        lifespan=_lifespan,
         title="OcrYoloEngine",
         version="0.2.0",
         description="面向自动化测试的视觉识别服务——截图发过来，返回文字和目标的坐标。",
