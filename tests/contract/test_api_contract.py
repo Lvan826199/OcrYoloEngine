@@ -137,6 +137,46 @@ def test_invalid_base64_returns_400(client):
     assert r.json()["error_code"] == "INVALID_IMAGE"
 
 
+def test_error_response_carries_real_request_id(client):
+    """错误响应的 request_id 必须是真实生成的 id,而非占位 "-"(可用于日志关联)。"""
+    r = client.post(
+        "/v1/match",
+        json={
+            "image": {"base64": "@@notbase64@@"},
+            "methods": ["template"],
+            "templates": [TEMPLATE_NAME],
+        },
+    )
+    assert r.status_code == 400
+    rid = r.json()["request_id"]
+    assert rid != "-"
+    assert len(rid) == 32  # uuid4().hex
+
+
+def test_upload_invalid_methods_returns_422_not_500(client):
+    """upload 传非法 methods:应走统一校验契约返回 422,而非裸 500。"""
+    ok, buf = cv2.imencode(".png", np.zeros((10, 10, 3), dtype=np.uint8))
+    assert ok
+    r = client.post(
+        "/v1/recognize/upload",
+        files={"file": ("a.png", buf.tobytes(), "image/png")},
+        data={"methods": "bogus"},
+    )
+    assert r.status_code == 422
+
+
+def test_upload_yolo_without_model_returns_422(client):
+    """upload methods=yolo 缺 model:与 JSON 接口一致返回 422。"""
+    ok, buf = cv2.imencode(".png", np.zeros((10, 10, 3), dtype=np.uint8))
+    assert ok
+    r = client.post(
+        "/v1/recognize/upload",
+        files={"file": ("a.png", buf.tobytes(), "image/png")},
+        data={"methods": "yolo"},
+    )
+    assert r.status_code == 422
+
+
 def test_detect_requires_model_422(client, scene_with_target_b64):
     r = client.post(
         "/v1/detect",

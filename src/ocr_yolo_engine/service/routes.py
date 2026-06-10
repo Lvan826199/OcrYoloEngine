@@ -6,10 +6,11 @@ import base64
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 
 from ocr_yolo_engine.image.loader import decode_image_bytes
 from ocr_yolo_engine.observability import metrics
-from ocr_yolo_engine.observability.logging import bind_request_id, new_request_id
 from ocr_yolo_engine.pipeline_runner import run_recognition
 from ocr_yolo_engine.schemas import ImageInput, Method, RecognizeRequest, RecognizeResponse
 from ocr_yolo_engine.service.auth import require_api_key
@@ -26,7 +27,6 @@ def _ctx(request: Request) -> AppContext:
 
 
 def _run(request: Request, req: RecognizeRequest, response: Response) -> RecognizeResponse:
-    bind_request_id(new_request_id())
     ctx = _ctx(request)
     result = run_recognition(ctx, req)
     # X-Cache 头:缓存关闭或本次 off → BYPASS;命中 → HIT;算了且缓存开 → MISS。
@@ -127,13 +127,18 @@ async def recognize_upload(
     b64 = base64.b64encode(data).decode()
     method_list: list[Method] = [m.strip() for m in methods.split(",") if m.strip()]  # type: ignore[misc]
     template_list = [t.strip() for t in templates.split(",")] if templates else None
-    req = RecognizeRequest(
-        image=ImageInput(base64=b64),
-        methods=method_list,
-        model=model,
-        templates=template_list,
-        conf_threshold=conf_threshold,
-    )
+    try:
+        req = RecognizeRequest(
+            image=ImageInput(base64=b64),
+            methods=method_list,
+            model=model,
+            templates=template_list,
+            conf_threshold=conf_threshold,
+        )
+    except ValidationError as exc:
+        # 手工构造模型的校验失败不会被 FastAPI 自动接管,
+        # 显式转成 RequestValidationError,与 JSON 接口一样返回 422。
+        raise RequestValidationError(exc.errors()) from exc
     return _run(request, req, response)
 
 

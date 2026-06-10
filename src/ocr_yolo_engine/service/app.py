@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+from collections.abc import Awaitable, Callable
+
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from ocr_yolo_engine.errors import EngineError
-from ocr_yolo_engine.observability.logging import current_request_id, setup_logging
+from ocr_yolo_engine.observability.logging import (
+    bind_request_id,
+    current_request_id,
+    new_request_id,
+    setup_logging,
+)
 from ocr_yolo_engine.service.deps import AppContext, build_context
 from ocr_yolo_engine.service.routes import router
 from ocr_yolo_engine.settings import Settings
@@ -26,6 +33,15 @@ def create_app(ctx: AppContext | None = None, settings: Settings | None = None) 
         ],
     )
     app.state.ctx = ctx or build_context(settings)
+
+    # request_id 必须在 async 中间件里绑定:同步路由跑在线程池,
+    # 线程内对 contextvar 的修改传不回事件循环,异常处理器会取到占位 "-"。
+    @app.middleware("http")
+    async def _bind_request_id(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        bind_request_id(new_request_id())
+        return await call_next(request)
 
     @app.exception_handler(EngineError)
     async def _engine_error_handler(request: Request, exc: EngineError) -> JSONResponse:
