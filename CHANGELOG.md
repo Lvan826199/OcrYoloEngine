@@ -10,6 +10,7 @@
 ### 变更
 - **expected.json 字段规范**：`tests/fixtures/` 的期望结果文件统一字段结构（`scene`/`scene_size`/`description` + 按方法分组的 `expectations`），3 个既有文件迁移到位；新增 `scripts/gen_expected.py` 对样例图跑真实识别生成期望草稿，保证"期望值出自真实运行"。规范写入 `tests/fixtures/README.md`。
 - **bug 修复日志改为长期文档**：迁移至 `docs/bug修复日志.md`（倒序累积，现象/根因/修法/验证），`plan/` 目录今后只放计划类文档；文档同步策略与 Bug 修复策略正式写入 `CLAUDE.md`。
+- **跨机共享的项目记忆**：新增根目录 `MEMORY.md`（工作偏好 + 跨会话注意事项），由 `CLAUDE.md` 经 `@MEMORY.md` import 自动加载，随 git 在多台电脑间同步。
 
 ### 新增
 - **真实游戏截图固定回归**：`tests/fixtures/` 收录开源游戏 SuperTuxKart 的两张真实截图（菜单 + 竞速 HUD，Wikimedia Commons，CC BY-SA 4.0，来源见该目录 README）。默认套件新增"从菜单截图裁真实按钮再找回"的模板匹配回归与防爆炸保护回归；冒烟套件新增真实 PaddleOCR 读 HUD 文字（计时器/圈数/赛道名）、读菜单标签、真实 yolov8n 检出画面角色 3 个用例。测试 143→148（默认 140 + 冒烟 8），全部通过。

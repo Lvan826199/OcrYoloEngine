@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 项目记忆（自动加载，跨机共享）
+
+@MEMORY.md
+
+仓库根目录的 `MEMORY.md` 是跨机共享的项目记忆（上方已通过 import 自动加载）：新增「重要记忆」（工作偏好、跨会话注意事项）写入该文件并随 git 提交；本机 `~/.claude` 持久 memory 只放机器特定内容。两边冲突时以 `MEMORY.md` 为准。
+
 ## 语言要求（强制）
 
 **在本仓库内，Claude Code 的所有输出一律使用简体中文。**
@@ -29,6 +35,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `docs/设计与决策.md` | 设计 spec(需求与架构的权威来源)+ 架构决策记录(ADR/MADR) |
 | `docs/开发说明.md` | **开发主线索引 + 进度表 + 任务清单 + 约定速查**，跨会话接手的第一入口 |
 | `docs/bug修复日志.md` | **长期累积的 bug 修复记录**（倒序），每条按「现象/根因/修法/验证」 |
+| `MEMORY.md`（根目录） | **跨机共享的项目记忆**：工作偏好 + 跨会话注意事项，经 `@import` 自动加载 |
 
 目录职责：`docs/` 放长期维护的文档（含修复日志）；`plan/` 只放**计划类**文档（一次性的批次方案，命名 `YYYY-MM-DD-xxx.md`），不放日志。
 
