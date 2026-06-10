@@ -138,6 +138,54 @@ def test_invalid_base64_returns_400(client):
     assert r.json()["error_code"] == "INVALID_IMAGE"
 
 
+def test_response_carries_x_request_id_header(client, scene_with_target_b64):
+    """所有响应都带 X-Request-ID 头,且与 body 的 request_id 一致(成功与错误)。"""
+    ok_resp = client.post(
+        "/v1/match",
+        json={
+            "image": {"base64": scene_with_target_b64},
+            "methods": ["template"],
+            "templates": [TEMPLATE_NAME],
+        },
+    )
+    assert ok_resp.status_code == 200
+    assert ok_resp.headers["X-Request-ID"] == ok_resp.json()["request_id"]
+
+    err_resp = client.post(
+        "/v1/match",
+        json={
+            "image": {"base64": "@@notbase64@@"},
+            "methods": ["template"],
+            "templates": [TEMPLATE_NAME],
+        },
+    )
+    assert err_resp.status_code == 400
+    assert err_resp.headers["X-Request-ID"] == err_resp.json()["request_id"]
+    assert err_resp.headers["X-Request-ID"] != ok_resp.headers["X-Request-ID"]
+
+
+def test_access_log_emitted_with_structured_fields(client, scene_with_target_b64, caplog):
+    """每个请求记一条结构化访问日志:method/path/status/elapsed_ms 齐全。"""
+    import logging as _logging
+
+    with caplog.at_level(_logging.INFO, logger="ocr_yolo_engine.access"):
+        client.post(
+            "/v1/match",
+            json={
+                "image": {"base64": scene_with_target_b64},
+                "methods": ["template"],
+                "templates": [TEMPLATE_NAME],
+            },
+        )
+    access = [r for r in caplog.records if r.name == "ocr_yolo_engine.access"]
+    assert access, "应产生访问日志记录"
+    fields = access[-1].extra_fields
+    assert fields["method"] == "POST"
+    assert fields["path"] == "/v1/match"
+    assert fields["status"] == 200
+    assert fields["elapsed_ms"] >= 0
+
+
 def test_error_response_carries_real_request_id(client):
     """错误响应的 request_id 必须是真实生成的 id,而非占位 "-"(可用于日志关联)。"""
     r = client.post(

@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+### 新增
+- **`X-Request-ID` 响应头**：所有响应（成功与错误）都带该头，与 body 的 `request_id` 一致，便于调用方/网关做日志关联。
+- **JSON 结构化访问日志**：每个请求记一条（method / path / status / elapsed_ms / request_id），与现有 JSON 日志同格式。
+- **夜间真实模型冒烟流水线**：`.github/workflows/smoke.yml` 每日定时 + 手动触发跑 `pytest -m smoke`，缓存 uv 依赖、PaddleOCR 模型与 yolov8n 权重。
+- **覆盖率门禁**：`scripts/check.sh` 的测试步骤加 `--cov-fail-under=85`（当前实测 88%），防覆盖率滑坡。
+
 ### 变更
 - **expected.json 字段规范**：`tests/fixtures/` 的期望结果文件统一字段结构（`scene`/`scene_size`/`description` + 按方法分组的 `expectations`），3 个既有文件迁移到位；新增 `scripts/gen_expected.py` 对样例图跑真实识别生成期望草稿，保证"期望值出自真实运行"。规范写入 `tests/fixtures/README.md`。
 - **bug 修复日志改为长期文档**：迁移至 `docs/bug修复日志.md`（倒序累积，现象/根因/修法/验证），`plan/` 目录今后只放计划类文档；文档同步策略与 Bug 修复策略正式写入 `CLAUDE.md`。

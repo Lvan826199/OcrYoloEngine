@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -18,6 +20,8 @@ from ocr_yolo_engine.observability.logging import (
 from ocr_yolo_engine.service.deps import AppContext, build_context
 from ocr_yolo_engine.service.routes import router
 from ocr_yolo_engine.settings import Settings
+
+_access_logger = logging.getLogger("ocr_yolo_engine.access")
 
 
 def create_app(ctx: AppContext | None = None, settings: Settings | None = None) -> FastAPI:
@@ -45,12 +49,29 @@ def create_app(ctx: AppContext | None = None, settings: Settings | None = None) 
 
     # request_id 必须在 async 中间件里绑定:同步路由跑在线程池,
     # 线程内对 contextvar 的修改传不回事件循环,异常处理器会取到占位 "-"。
+    # 同一中间件顺带:给所有响应(含错误)加 X-Request-ID 头 + 记结构化访问日志。
     @app.middleware("http")
-    async def _bind_request_id(
+    async def _request_context(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        bind_request_id(new_request_id())
-        return await call_next(request)
+        request_id = new_request_id()
+        bind_request_id(request_id)
+        started = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        response.headers["X-Request-ID"] = request_id
+        _access_logger.info(
+            "access",
+            extra={
+                "extra_fields": {
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": response.status_code,
+                    "elapsed_ms": round(elapsed_ms, 2),
+                }
+            },
+        )
+        return response
 
     @app.exception_handler(EngineError)
     async def _engine_error_handler(request: Request, exc: EngineError) -> JSONResponse:

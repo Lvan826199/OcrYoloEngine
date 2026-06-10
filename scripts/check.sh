@@ -16,7 +16,7 @@ uv run ruff format --check src tests
 echo "==> mypy"
 uv run mypy
 
-echo "==> pytest(默认跳过 smoke)"
-uv run pytest -q
+echo "==> pytest(默认跳过 smoke,覆盖率门禁 85%)"
+uv run pytest -q --cov=ocr_yolo_engine --cov-fail-under=85
 
 echo "✅ 全部门禁通过"

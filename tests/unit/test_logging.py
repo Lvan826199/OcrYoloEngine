@@ -31,6 +31,16 @@ def test_json_formatter_includes_request_id():
     assert payload["level"] == "INFO"
 
 
+def test_json_formatter_merges_extra_fields():
+    """extra={"extra_fields": {...}} 的结构化字段应并入 JSON 输出顶层。"""
+    record = logging.LogRecord("t", logging.INFO, __file__, 1, "access", (), None)
+    record.extra_fields = {"method": "POST", "path": "/v1/match", "status": 200}
+    payload = json.loads(JsonFormatter().format(record))
+    assert payload["method"] == "POST"
+    assert payload["path"] == "/v1/match"
+    assert payload["status"] == 200
+
+
 def test_json_formatter_includes_utc_timestamp():
     """日志必须带时间戳(ISO8601 UTC),否则生产排查无法对时间线。"""
     record = logging.LogRecord("t", logging.INFO, __file__, 1, "hi", (), None)

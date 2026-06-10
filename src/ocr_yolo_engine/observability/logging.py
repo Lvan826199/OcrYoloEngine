@@ -34,6 +34,10 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "request_id": current_request_id(),
         }
+        # 结构化扩展字段(如访问日志的 method/path/status)并入顶层。
+        fields = getattr(record, "extra_fields", None)
+        if isinstance(fields, dict):
+            payload.update(fields)
         if record.exc_info:
             payload["exc"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)
