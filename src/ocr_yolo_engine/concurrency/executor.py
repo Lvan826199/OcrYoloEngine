@@ -34,23 +34,27 @@ class InferenceExecutor:
             raise EngineError(
                 ErrorCode.OVERLOADED, "服务繁忙,请稍后重试", details={"retry_after": 1}
             )
+        lock = self._model_lock(model_key)
+
+        def guarded() -> T:
+            with lock:
+                return fn()
+
         try:
-            lock = self._model_lock(model_key)
-
-            def guarded() -> T:
-                with lock:
-                    return fn()
-
             future = self._pool.submit(guarded)
-            try:
-                return future.result(timeout=self._timeout)
-            except FutureTimeout as exc:
-                future.cancel()
-                raise EngineError(
-                    ErrorCode.TIMEOUT, "推理超时", details={"timeout_s": self._timeout}
-                ) from exc
-        finally:
+        except BaseException:
             self._slots.release()
+            raise
+        # 槽位在任务真正结束(含被取消)时才归还:超时后线程仍在跑(无法中断),
+        # 若提前归还,过载保护会放进新请求继续堆积。
+        future.add_done_callback(lambda _f: self._slots.release())
+        try:
+            return future.result(timeout=self._timeout)
+        except FutureTimeout as exc:
+            future.cancel()  # 尚未开跑则取消(取消同样触发回调归还槽位)
+            raise EngineError(
+                ErrorCode.TIMEOUT, "推理超时", details={"timeout_s": self._timeout}
+            ) from exc
 
     def shutdown(self) -> None:
         self._pool.shutdown(wait=False, cancel_futures=True)

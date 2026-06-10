@@ -24,14 +24,19 @@ def to_rgb(bgr: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
 
-def enforce_limits(raw_bytes: bytes, image: np.ndarray, *, max_bytes: int, max_pixels: int) -> None:
-    """校验字节数与分辨率不超过上限;超过时抛 IMAGE_TOO_LARGE。"""
+def enforce_byte_limit(raw_bytes: bytes, *, max_bytes: int) -> None:
+    """校验原始字节数不超过上限;必须在解码前调用,防解压炸弹先吃内存。"""
     if len(raw_bytes) > max_bytes:
         raise EngineError(
             ErrorCode.IMAGE_TOO_LARGE,
             "图片字节数超过上限",
             details={"bytes": len(raw_bytes), "max_bytes": max_bytes},
         )
+
+
+def enforce_limits(raw_bytes: bytes, image: np.ndarray, *, max_bytes: int, max_pixels: int) -> None:
+    """校验字节数与分辨率不超过上限;超过时抛 IMAGE_TOO_LARGE。"""
+    enforce_byte_limit(raw_bytes, max_bytes=max_bytes)
     h, w = image.shape[:2]
     if w * h > max_pixels:
         raise EngineError(

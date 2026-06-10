@@ -81,3 +81,38 @@ def test_timeout_raises_504():
         ex.submit("m", slow)
     assert ei.value.code is ErrorCode.TIMEOUT
     ex.shutdown()
+
+
+def test_timeout_zombie_keeps_slot_until_task_ends():
+    """超时返回 504 后任务线程仍在跑(僵尸):槽位在任务真正结束前不归还。
+
+    否则后续请求会继续涌入排队,背压保护失真。真实线程验证:
+    超时后立刻再提交应 503 过载;任务结束后槽位归还,提交恢复成功。
+    """
+    ex = InferenceExecutor(max_workers=1, max_queue=0, timeout_s=0.05)
+    release = threading.Event()
+
+    def slow():
+        release.wait(5)
+        return 1
+
+    with pytest.raises(EngineError) as ei:
+        ex.submit("m", slow)
+    assert ei.value.code is ErrorCode.TIMEOUT
+
+    # 僵尸任务还占着唯一槽位 → 新提交必须立刻 503,而不是排进队列。
+    with pytest.raises(EngineError) as ei2:
+        ex.submit("m", lambda: 1)
+    assert ei2.value.code is ErrorCode.OVERLOADED
+
+    release.set()
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            assert ex.submit("m", lambda: 2) == 2
+            break
+        except EngineError:
+            time.sleep(0.01)
+    else:
+        pytest.fail("任务结束后槽位未归还")
+    ex.shutdown()

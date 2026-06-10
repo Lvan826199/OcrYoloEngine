@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import os
 
 import cv2
 import numpy as np
@@ -397,6 +398,33 @@ def test_recognize_merge_cache_roundtrip_and_no_cross_contamination(scene_with_t
     assert r3.headers["X-Cache"] == "MISS"
     assert r3.json()["from_cache"] is False
     assert r3.json()["merged"] is not None
+
+
+def test_oversized_bytes_rejected_before_decode():
+    """超限字节即使不是合法图片也应 413(字节上限先于解码,防解压炸弹吃内存)。"""
+    c = make_client(settings=Settings(api_keys=[], allowed_path_roots=[], max_image_bytes=64))
+    blob = base64.b64encode(os.urandom(1024)).decode()
+    r = c.post(
+        "/v1/match",
+        json={"image": {"base64": blob}, "methods": ["template"], "templates": [TEMPLATE_NAME]},
+    )
+    assert r.status_code == 413
+    assert r.json()["error_code"] == "IMAGE_TOO_LARGE"
+
+
+def test_metrics_records_error_status(client, scene_with_target_b64):
+    """识别失败也必须进指标:未知模板 → 404,/metrics 出现 status=\"error\" 计数。"""
+    r = client.post(
+        "/v1/match",
+        json={
+            "image": {"base64": scene_with_target_b64},
+            "methods": ["template"],
+            "templates": ["不存在的模板"],
+        },
+    )
+    assert r.status_code == 404
+    m = client.get("/metrics").text
+    assert 'oye_requests_total{method="template",status="error"}' in m
 
 
 def test_metrics_endpoint_after_match(client, scene_with_target_b64):

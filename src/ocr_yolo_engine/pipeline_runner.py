@@ -17,6 +17,7 @@ from ocr_yolo_engine.observability.logging import current_request_id
 from ocr_yolo_engine.preprocessing.annotate import draw_detections
 from ocr_yolo_engine.preprocessing.pipeline import (
     crop_roi,
+    enforce_byte_limit,
     enforce_limits,
     finalize_detections,
     to_rgb,
@@ -44,7 +45,8 @@ def _template_versions(ctx: AppContext, names: list[str]) -> dict[str, str]:
 
 
 def _load_bytes_and_image(ctx: AppContext, req: RecognizeRequest) -> tuple[bytes, np.ndarray]:
-    """返回 (raw_bytes, bgr_image)。raw_bytes 用于字节大小上限校验。"""
+    """返回 (raw_bytes, bgr_image)。字节上限在图像解码前校验,防解压炸弹先吃内存。"""
+    max_bytes = ctx.settings.max_image_bytes
     if req.image.base64 is not None:
         import binascii
 
@@ -57,10 +59,11 @@ def _load_bytes_and_image(ctx: AppContext, req: RecognizeRequest) -> tuple[bytes
             raw = base64.b64decode(payload, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise EngineError(ErrorCode.INVALID_IMAGE, "base64 解码失败") from exc
+        enforce_byte_limit(raw, max_bytes=max_bytes)
         img = decode_image_bytes(raw)
         return raw, img
     assert req.image.path is not None
-    return load_from_path(req.image.path, ctx.settings.allowed_path_roots)
+    return load_from_path(req.image.path, ctx.settings.allowed_path_roots, max_bytes=max_bytes)
 
 
 def run_recognition(ctx: AppContext, req: RecognizeRequest) -> RecognizeResponse:
@@ -159,7 +162,12 @@ def _run_single_method(
     def _infer(r: object = recognizer) -> list[RawDetection]:
         return r.infer(cropped, infer_ctx)  # type: ignore[attr-defined, no-any-return]
 
-    raws = ctx.executor.submit(model_key, _infer)
+    try:
+        raws = ctx.executor.submit(model_key, _infer)
+    except Exception:
+        # 失败(超时/过载/识别器异常)同样要进指标,否则 status="error" 永不出现。
+        metrics.record(method, (time.perf_counter() - started) * 1000, ok=False)
+        raise
     elapsed_ms = (time.perf_counter() - started) * 1000
     metrics.record(method, elapsed_ms, ok=True)
     detections = finalize_detections(list(raws), offset=offset, full_w=full_w, full_h=full_h)

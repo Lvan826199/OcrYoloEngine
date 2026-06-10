@@ -12,6 +12,12 @@ from ocr_yolo_engine.templates.store import TemplateSpec
 
 Box = tuple[float, float, float, float, float]  # x1,y1,x2,y2,score
 
+# 模板未显式配置 threshold 时的阈值下限:归一化平方差得分普遍偏高,
+# 过低的请求阈值会让全图逐像素命中(百万级候选)。显式配置的模板阈值不受此限。
+MIN_FALLBACK_THRESHOLD = 0.5
+# 每个尺度保留的最高分候选数上限,封顶 NMS 的 O(n²) 开销。
+MAX_CANDIDATES_PER_SCALE = 200
+
 
 class _StoreLike(Protocol):
     def get_image(self, name: str) -> np.ndarray: ...
@@ -57,7 +63,12 @@ class TemplateRecognizer:
         results: list[RawDetection] = []
         for name in ctx.templates:
             spec = self._store.spec(name)
-            threshold = float(spec.params.get("threshold", ctx.conf_threshold))
+            configured = spec.params.get("threshold")
+            threshold = (
+                float(configured)
+                if configured is not None
+                else max(ctx.conf_threshold, MIN_FALLBACK_THRESHOLD)
+            )
             tmpl = cv2.cvtColor(self._store.get_image(name), cv2.COLOR_BGR2GRAY)
             boxes: list[Box] = []
             for scale in self._scales:
@@ -72,9 +83,14 @@ class TemplateRecognizer:
                 max_diff = (255.0**2) * resized.size
                 res = 1.0 - diff / max_diff
                 ys, xs = np.where(res >= threshold)
-                for x, y in zip(xs.tolist(), ys.tolist(), strict=True):
-                    score = float(res[y, x])
-                    boxes.append((float(x), float(y), float(x + tw), float(y + th), score))
+                scores = res[ys, xs]
+                if scores.size > MAX_CANDIDATES_PER_SCALE:
+                    top = np.argpartition(scores, -MAX_CANDIDATES_PER_SCALE)[
+                        -MAX_CANDIDATES_PER_SCALE:
+                    ]
+                    xs, ys, scores = xs[top], ys[top], scores[top]
+                for x, y, score in zip(xs.tolist(), ys.tolist(), scores.tolist(), strict=True):
+                    boxes.append((float(x), float(y), float(x + tw), float(y + th), float(score)))
             for x1, y1, x2, y2, score in non_max_suppression(boxes, self._iou):
                 results.append(
                     RawDetection(
