@@ -1,0 +1,136 @@
+# Bug 修复日志（长期）
+
+> 本文件**长期累积**所有 bug 修复记录:新批次追加在最上方(倒序)。
+> 每条记录按「现象 → 根因 → 修法 → 验证」组织;配套流程规则见 CLAUDE.md「Bug 修复策略」。
+> 修复批次的方案计划放 `plan/` 目录,本文件只放修复结果记录。
+
+---
+
+## 2026-06-10 代码校验修复批次（v0.2.1）
+
+> 配套计划:`plan/2026-06-10-代码校验修复计划.md`;对 `src/` 全量代码校验后的集中修复。
+
+### 批次一(P0)— 2026-06-10
+
+#### #1 错误响应 request_id 恒为 "-"
+
+- **现象**:任何 4xx/5xx 错误响应的 `request_id` 都是占位符 `"-"`(真实请求复现),无法用它关联日志排查。
+- **根因**:`routes._run` 在同步路由里 `bind_request_id`,同步路由由 FastAPI 放到线程池执行,线程内对 contextvar 的修改不会传回事件循环上下文;`app.py` 的 EngineError 异常处理器(async)取到的是默认值 `"-"`。
+- **修法**:request_id 的生成与绑定上移到 async HTTP 中间件(`service/app.py` `_bind_request_id`),请求一进来就绑定;contextvar 沿"中间件 → 路由线程"方向复制传播,成功路径与异常处理器都能取到。`routes._run` 不再自行绑定。
+- **验证**:新增契约测试 `test_error_response_carries_real_request_id`(非法 base64 → 400,断言 request_id 为 32 位 uuid hex)。125 测试全绿。
+
+#### #2 upload 接口非法参数返回裸 500
+
+- **现象**:`POST /v1/recognize/upload` 传 `methods=bogus`(或 yolo 缺 model)返回 `500 Internal Server Error` 纯文本,违反统一错误契约。
+- **根因**:路由内手工构造 `RecognizeRequest`,pydantic `ValidationError` 不在 FastAPI 自动校验链路上,无人接住直接炸 500。
+- **修法**:`routes.recognize_upload` 捕获 `ValidationError` 转抛 `RequestValidationError`,与 JSON 接口同走 422 契约。
+- **验证**:新增契约测试 `test_upload_invalid_methods_returns_422_not_500`、`test_upload_yolo_without_model_returns_422`(真实 PNG 上传)。125 测试全绿。
+
+### 批次二(P1)— 2026-06-10
+
+#### #3 paddleocr 依赖无上界(前向必崩)
+
+- **现象**:`pyproject.toml` 中 `paddleocr>=2.7`;PaddleOCR 3.x 移除了 `use_gpu`/`use_angle_cls` 构造参数且改了 `.ocr()` 返回结构,新环境装到 3.x 时 `recognizers/ocr.py` 直接崩。
+- **根因**:依赖未设上界,代码按 2.x API 编写。
+- **修法**:pin `paddleocr>=2.7,<3`(附注释说明原因),`uv lock` 同步。
+- **验证**:锁文件仅约束行变化(当前解析仍为 2.10);默认套件全绿。
+
+#### #4 指标只记成功,失败永不计数
+
+- **现象**:`/metrics` 的 `oye_requests_total` 永远只有 `status="ok"`;超时/过载/识别器异常都不进指标——监控最需要的恰恰是这些。
+- **根因**:`pipeline_runner._run_single_method` 里 `metrics.record(ok=True)` 写死,异常路径直接向上抛,`ok` 参数是死代码。
+- **修法**:try/except 包住 `executor.submit`,失败记 `ok=False` 再抛。
+- **验证**:新增契约测试 `test_metrics_records_error_status`(真实请求未知模板 → 404,`/metrics` 出现 `status="error"`)。
+
+#### #5 先解码后限额(解压炸弹)
+
+- **现象**:几十 KB 的恶意 PNG 可解码成数 GB 数组,内存先被吃掉,之后才被 `enforce_limits` 拒绝。
+- **根因**:`_load_bytes_and_image` 先 `cv2.imdecode`,字节/像素上限校验在解码之后。
+- **修法**:新增 `preprocessing.enforce_byte_limit`,base64 与 path 两条加载路径都在解码前先校验字节上限(`load_from_path` 增加 `max_bytes` 参数);像素上限保持解码后(cv2 无法预读尺寸)。
+- **验证**:新增契约测试 `test_oversized_bytes_rejected_before_decode`(1KB 随机非图片字节 + max_image_bytes=64 → 413 IMAGE_TOO_LARGE,而非解码失败的 400)。
+
+#### #6 模板匹配候选框爆炸
+
+- **现象**:模板未配 `params.threshold` 时回落到全局默认置信度 0.25;归一化平方差得分普遍偏高(随机内容也约 0.8),全图逐像素命中 → 百万级候选 × O(n²) NMS,单请求可打挂服务。
+- **根因**:阈值语义错配(把"检测置信度门槛"直接当模板匹配相似度阈值)+ 候选数无上限。
+- **修法**:`template.py` 两道防线——(a) 未显式配置阈值时取 `max(请求值, 0.5)` 下限(显式配置不受限);(b) 每尺度候选按得分 top-K(200)截断,封顶 NMS 开销。
+- **验证**:新增单测 `test_fallback_threshold_has_floor`(灰 200 场景得分 0.385:旧实现全图命中,新实现空结果)、`test_candidate_count_is_bounded_per_scale`(灰 100 场景约 2 万候选 → 结果 ≤200 且耗时 <5s)。真实图像数据。
+
+#### #7 超时僵尸任务提前归还槽位
+
+- **现象**:推理超时返回 504 后,工作线程仍在跑(Python 线程无法中断)且持有模型锁,但并发槽位已归还 → 新请求继续涌入排队,背压保护失真。
+- **根因**:`executor.submit` 在 `finally` 里释放信号量,与任务实际生命周期脱钩。
+- **修法**:槽位释放挂到 `future.add_done_callback`(任务真正结束/被取消才归还);`pool.submit` 本身失败时兜底释放。
+- **验证**:新增单测 `test_timeout_zombie_keeps_slot_until_task_ends`(真实线程:超时后立刻再提交必须 503;任务结束后提交恢复成功)。
+
+### 批次三(P2 性能 + P3 清理)— 2026-06-10
+
+#### #8 缓存键改 hash 原始压缩字节
+
+- **现象**:开启结果缓存时,每个请求都对解码后 BGR 数组(4K 图约 48MB)算 sha256,固定开销大。
+- **修法**:`compute_cache_key` 改收原始压缩字节(`raw_bytes` 调用方本就在手),语义等价(同字节必同图);同图不同编码不再共享条目,仅少一次命中机会,正确性不受影响。
+- **验证**:`test_cache.py` 4 个键测试改为字节口径;契约缓存测试(HIT/MISS/失效)全部保持绿。
+
+#### #9 registry 持全局锁加载模型
+
+- **现象**:加载 YOLO 权重可达数秒,期间全局 RLock 把所有模型(含已缓存)的取用全部阻塞。
+- **修法**:per-name 加载锁 + 双重检查;全局锁只护缓存字典,加载在锁外进行(仅同名串行)。
+- **验证**:新增单测 `test_slow_load_does_not_block_cached_get`(真实线程:慢加载 0.3s 期间取缓存模型须 <0.15s)、`test_concurrent_get_same_model_loads_once`(4 线程并发取同名,loader 只跑一次)。
+
+#### #10 模板匹配被模型锁无谓串行
+
+- **现象**:executor 按 `model_key="template"` 加锁,纯 OpenCV 计算被全局串行,白白损失吞吐(OCR/YOLO 串行是合理的——引擎非线程安全)。
+- **修法**:`Recognizer` 基类新增 `requires_serial_inference`(默认 True),`TemplateRecognizer` 置 False;`executor.submit` 增加 `serialize` 参数,False 时跳过模型锁。三个识别器顺带正式继承 `Recognizer` 抽象。
+- **验证**:新增单测 `test_non_serialized_tasks_run_concurrently`(Barrier 证明同 key 两任务真并发)。
+
+#### #11 upload 接口重复解码
+
+- **现象**:上传路径同一张图解码两次(路由校验一次 + 管线再一次)外加 base64 编解码往返。
+- **修法**:`run_recognition` 增加 `preloaded=(原始字节, BGR 图)` 参数,upload 路由解码一次后直接传给管线复用。
+- **验证**:新增契约测试 `test_upload_template_match_end_to_end`(真实场景 PNG 上传,检出目标坐标正确)守护重构。
+
+#### #12 模板灰度图每请求重复转换
+
+- **修法**:`TemplateStore.get_gray` 按名缓存灰度图,识别器直接取用。
+- **验证**:新增单测 `test_get_gray_caches_and_matches_color`(同对象缓存 + 内容与彩色转灰度一致)。
+
+#### P3 清理
+
+| 项 | 修法 | 验证 |
+|---|---|---|
+| `warmup` 死配置 | 从 `settings.py`、`.env.example` 删除(从未被使用) | 移除对应断言,文档同步阶段清理使用文档 |
+| API Key 计时侧信道 | `secrets.compare_digest` 常数时间比较 | 既有鉴权测试保持绿 |
+| executor 不随服务关停 | FastAPI lifespan 在 shutdown 时调 `executor.shutdown()` | 既有套件全绿 |
+| JSON 日志无时间戳 | 增加 ISO8601 UTC `time` 字段 | 新增 `test_json_formatter_includes_utc_timestamp` |
+| `recognizers: dict[Method, object]` | 改 `dict[Method, Recognizer]`,删除管线 2 处 type: ignore | mypy strict 全绿 |
+| `_find_free_port` 端口耗尽静默返回 | 返回 None,serve 明确报错退出 | 新增 2 个真实 socket 单测 |
+
+#### 附带修复:cv2 返回值类型注解(环境相关)
+
+- **现象**:`scripts/check.sh` 的 `uv sync --extra dev`(纯 dev 环境)下 mypy 报 4 处 `no-any-return`;全量环境(装了 ocr/yolo extras)下不报——不同 opencv 发行包的类型存根对返回值标注不一(Any vs ndarray)。
+- **修法**:4 处 `cv2.imdecode/imread/cvtColor` 调用点加显式 `np.ndarray` 局部变量注解,两种环境下 mypy 均通过。
+- **验证**:两种依赖环境 mypy 全绿。
+
+#### 明确不改(已评估)
+
+- `/ready` 语义:AppContext 启动时装配,失败则服务起不来,当前已基本成立,暂不动。
+- 同步路由 + 阻塞等待的双线程占用:架构取舍,默认线程量充足,不在本轮范围。
+
+### 真实复杂游戏画面验证 — 2026-06-10
+
+应用户要求,用网上的真实游戏截图(开源游戏 SuperTuxKart,Wikimedia Commons,1366x768 竞速 HUD + 1065x594 主菜单)对修复后的服务做了端到端人工验证:**真实 `ocr-yolo serve` 起服务 + HTTP 请求 + path 白名单传图 + 示例配置回退**,同时覆盖了「需手动测试」清单里的 serve 项。图片在 /tmp,不入库。
+
+| 验证项 | 结果 |
+|---|---|
+| 模板匹配(从菜单截图裁真实地球按钮 96x112,threshold=0.8) | ✅ 精确命中:center=(710,404) 与裁剪位置完全一致,conf=1.000,110ms |
+| 模板匹配(同模板不配 threshold,走 0.5 下限回退) | ✅ 防爆炸生效:仅 4 个结果、~100ms 返回(修复前此场景会全图逐像素命中) |
+| OCR 竞速 HUD | ✅ 计时器 `00:01.53`、圈数 `1/3`、赛道名 `'Cocoa River'`/`by Ozoneone` 全对(conf 0.96~1.00),4.5s(首次含引擎加载) |
+| OCR 主菜单 | ✅ 11 段:窗口标题、FPS 调试栏、`Story Mode`/`Singleplayer`/`Splitscreen Multiplayer`/`Online` 菜单标签全对;⚠️ 漏检 `Addons` 标签(小字+低对比) |
+| YOLO(通用 yolov8n) | ✅ 检出赛道旁站立角色 person conf=0.74 位置正确;卡通画面整体检出稀疏——符合预期,游戏目标应训练专用模型 |
+| ROI 回映射 | ✅ 只识别右上角 266x160 区域,计时器坐标正确映射回全图 (1254,38) |
+| merge=dedup + debug 标注图 | ✅ OCR+模板合并 15 条;标注图框位正确 |
+
+**真实发现(使用注意,非缺陷)**:模板带较多深色平坦背景时,归一化平方差打分偏高——地球按钮在 0.8 阈值下出现 3 个 conf≈0.96 的假阳性(匹配到画面其他暗区);真命中为 1.000,拉开 0.97 阈值即可区分。**建议写进使用习惯:游戏 UI 模板尽量紧贴图标裁剪、少含背景,深色/低对比模板把 threshold 提到 0.95+**(已在使用文档·模板匹配注意事项补充)。
+
+**后续(同日)**:应用户要求,两张游戏截图已收进 `tests/fixtures/`(`game_menu.png`、`game_race.jpg`,CC BY-SA 4.0 署名见 fixtures README)做固定回归:默认套件 `tests/unit/test_game_golden.py`(按钮模板精确找回 + 防爆炸保护有界),冒烟套件新增真实 OCR HUD/菜单标签、真实 YOLO 角色检出 3 个用例,期望值固化在 `game_menu.expected.json`/`game_race.expected.json`(坐标带容差)。测试总量 143→148 全绿。
+
