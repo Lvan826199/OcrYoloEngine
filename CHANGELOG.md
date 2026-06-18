@@ -8,7 +8,7 @@
 ## [未发布]
 
 ### 新增
-- **AI 助手规则同步脚本**：新增 `scripts/sync_agent_docs.py`，以 `CLAUDE.md` 为唯一源文件生成 `AGENTS.md`；新增 `test_agent_docs_sync` 防止两份规则漂移。
+- **AI 助手规则单源化**：`CLAUDE.md` 作为唯一规则源，`AGENTS.md` 只作为 Codex 入口引用 `CLAUDE.md`，不再复制规则正文，避免两份规范漂移；新增可复用 skill `skills/agent-rules-single-source`，便于在其他仓库落地同一规范。
 - **自定义 YOLO 模型训练端到端教程**：`training/README.md` 重写为完整教程（采集 → 标注 → 组织数据集 → 训练 → 看懂结果 → 上线服务 → 迭代）；新增 `training/make_demo_dataset.py` 零标注合成数据集生成器（5 分钟 demo 通道）。CPU 实测全流程：40 轮训练 2.2 分钟、mAP50 两类均 0.995、自训模型经服务 `/v1/detect` 检出目标坐标偏差 <0.005。`train.py` 修复无 GPU 机器默认参数必崩的问题（默认自动选设备），训练完打印权重路径与上线三步提示。教程含「预标注自举」流程：用第一版模型批量预标注（`yolo predict save_txt`），人工只修不画，实测预标坐标与真值偏差 <0.003。
 - **`X-Request-ID` 响应头**：所有响应（成功与错误）都带该头，与 body 的 `request_id` 一致，便于调用方/网关做日志关联。
 - **JSON 结构化访问日志**：每个请求记一条（method / path / status / elapsed_ms / request_id），与现有 JSON 日志同格式。
@@ -20,10 +20,11 @@
 - **expected.json 字段规范**：`tests/fixtures/` 的期望结果文件统一字段结构（`scene`/`scene_size`/`description` + 按方法分组的 `expectations`），3 个既有文件迁移到位；新增 `scripts/gen_expected.py` 对样例图跑真实识别生成期望草稿，保证"期望值出自真实运行"。规范写入 `tests/fixtures/README.md`。
 - **bug 修复日志改为长期文档**：迁移至 `docs/bug修复日志.md`（倒序累积，现象/根因/修法/验证），`plan/` 目录今后只放计划类文档；文档同步策略与 Bug 修复策略正式写入 `CLAUDE.md`。
 - **跨机共享的项目记忆**：新增根目录 `MEMORY.md`（工作偏好 + 跨会话注意事项），由 `CLAUDE.md` 经 `@MEMORY.md` import 自动加载，随 git 在多台电脑间同步。
+- **本地工具配置隔离**：`.claude/`、`.agent/`、`.agents/`、`.codex/`、`.Codex/` 统一视为本机私有目录，只放权限、缓存、机器路径等内容，不跨工具同步、不入库。
 
 ### 修复
 - **upload 解码前限额补齐**：`/v1/recognize/upload` 现在与 base64/path 输入一致，先校验 `max_image_bytes` 再解码，超限返回 `413 IMAGE_TOO_LARGE`。
-- **单方式接口请求体简化**：`/v1/detect` 可只传 `image + model`，`/v1/match` 可只传 `image + templates`，不再强制额外传 `methods`；旧请求格式继续兼容。新增 3 个契约测试与 1 个助手规则同步测试，默认测试 146→150（含冒烟共 158）。
+- **单方式接口请求体简化**：`/v1/detect` 可只传 `image + model`，`/v1/match` 可只传 `image + templates`，不再强制额外传 `methods`；旧请求格式继续兼容。新增 3 个契约测试，默认测试 146→149（含冒烟共 157）。
 
 ## [0.2.1] - 2026-06-10
 

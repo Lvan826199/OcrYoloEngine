@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-<!-- agent-doc-source: 本文件是 AI 助手规则源文件；修改后运行 `uv run python scripts/sync_agent_docs.py` 生成 AGENTS.md。 -->
-
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目记忆（自动加载，跨机共享）
@@ -9,6 +7,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 @MEMORY.md
 
 仓库根目录的 `MEMORY.md` 是跨机共享的项目记忆（上方已通过 import 自动加载）：新增「重要记忆」（工作偏好、跨会话注意事项）写入该文件并随 git 提交；本机 `~/.claude` 持久 memory 只放机器特定内容。两边冲突时以 `MEMORY.md` 为准。
+
+## 本地工具配置隔离（强制）
+
+`.claude/`、`.agent/`、`.agents/`、`.codex/`、`.Codex/` 都是本机工具私有配置目录，放权限白名单、缓存、机器路径、临时状态等内容，必须保持 gitignore，不做跨工具同步、不提交入库。
+
+跨工具共享的内容只放三类位置：
+
+- `CLAUDE.md`：唯一完整助手规则源。
+- `AGENTS.md`：Codex 入口，只引用 `CLAUDE.md`，不复制规则正文。
+- `MEMORY.md`：跨机会话记忆，放非敏感、可共享的偏好和注意事项。
 
 ## 语言要求（强制）
 
@@ -21,7 +29,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态
 
-首版骨架 + 全部增强已完成(22 个基础任务 + 首版后增强 + v0.2.1 代码校验修复批次):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发限流、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁。debug 标注图、模型热卸载/重载、Prometheus `/metrics`、可插拔结果缓存、多方法合并策略等增强已落地。默认 150 + 真实冒烟 8 共 158 个测试全绿。修复/优化批次的计划放 `plan/`、修复日志记 `docs/bug修复日志.md`。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记;资产配置采用 `.example` 模板入库 + 实际文件 gitignore + 加载时自动回退读 `.example`(开箱即用且规范)。**
+首版骨架 + 全部增强已完成(22 个基础任务 + 首版后增强 + v0.2.1 代码校验修复批次):FastAPI `/v1` 服务、OCR/YOLO/模板匹配三识别器、模型注册表与模板库、并发限流、鉴权、CLI、隔离训练入口、CPU/GPU 镜像(uv 构建)与质量门禁。debug 标注图、模型热卸载/重载、Prometheus `/metrics`、可插拔结果缓存、多方法合并策略等增强已落地。默认 149 + 真实冒烟 8 共 157 个测试全绿。修复/优化批次的计划放 `plan/`、修复日志记 `docs/bug修复日志.md`。后续工作见 `docs/开发说明.md` 进度表与 `README.md` 路线图。**模型权重不入库,需另行获取并在 `configs/models.yaml` 登记;资产配置采用 `.example` 模板入库 + 实际文件 gitignore + 加载时自动回退读 `.example`(开箱即用且规范)。**
 
 ## 文档引用与同步策略（强制）
 
@@ -45,7 +53,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **每完成一个任务**，回 `docs/开发说明.md` 更新「进度表」（标 ✅ + 完成日期）。
 - 改动设计 / 架构后，必须同步 `docs/开发说明.md` 的进度与约定。
-- 新增或调整工作规则时，先改本文件（CLAUDE.md），再运行 `uv run python scripts/sync_agent_docs.py` 生成 `AGENTS.md`，并同步 `README.md`。
+- 新增或调整工作规则时，只改本文件（CLAUDE.md）并同步 `README.md`；`AGENTS.md` 只保留 Codex 入口说明并引用本文件，不复制规则正文。
 - 有用户可见变更时更新 `CHANGELOG.md`；涉及架构取舍时在 `docs/设计与决策.md` 的「架构决策记录」一节新增一条 ADR。
 - 修了 bug 必须在 `docs/bug修复日志.md` 追加记录（见下节）。
 - 接口 / 配置 / 错误码变化时同步 `docs/使用文档.md` 与 `docs/接口集成指南.md`；部署方式变化时同步 `docs/部署文档.md`。
@@ -145,7 +153,6 @@ uv run ruff check src tests    # lint
 uv run ruff format src tests   # 格式化
 uv run mypy                    # 类型检查
 uv run pre-commit run --all-files   # 全量质量门禁
-uv run python scripts/sync_agent_docs.py   # 从 CLAUDE.md 生成 AGENTS.md
 uv run ocr-yolo serve          # 启动服务(默认 8000,被占自动切下一个)
 uv run ocr-yolo infer img.png --methods ocr   # 本地单图推理
 ```

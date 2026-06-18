@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Rules Single Source"
+  short_description: "Single-source AI assistant repo rules"
+  default_prompt: "Use $agent-rules-single-source to standardize AI assistant rules in this repository."
