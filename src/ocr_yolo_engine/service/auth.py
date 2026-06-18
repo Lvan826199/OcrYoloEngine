@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Header, Request
 
+from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.settings import Settings, get_settings
 
 
@@ -16,7 +17,7 @@ def verify_api_key(provided: str | None, settings: Settings) -> None:
     if provided is None or not any(
         secrets.compare_digest(provided, key) for key in settings.api_keys
     ):
-        raise HTTPException(status_code=401, detail="无效或缺失的 API Key")
+        raise EngineError(ErrorCode.UNAUTHORIZED, "无效或缺失的 API Key")
 
 
 def _settings_for(request: Request) -> Settings:

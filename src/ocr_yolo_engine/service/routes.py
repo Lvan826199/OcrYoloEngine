@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import base64
-from typing import Any, cast
+import json
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +15,7 @@ from ocr_yolo_engine.observability import metrics
 from ocr_yolo_engine.pipeline_runner import run_recognition
 from ocr_yolo_engine.preprocessing.pipeline import enforce_byte_limit
 from ocr_yolo_engine.schemas import (
+    ROI,
     DetectRequest,
     ImageInput,
     MatchRequest,
@@ -50,6 +52,29 @@ def _run(
     else:
         response.headers["X-Cache"] = "MISS"
     return result
+
+
+def _parse_upload_roi(raw: str | None) -> ROI | None:
+    """解析 upload 表单里的 roi JSON 字符串,统一转成 FastAPI 422 校验错误。"""
+    if raw is None or not raw.strip():
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RequestValidationError(
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("body", "roi"),
+                    "msg": "roi 必须是 JSON 对象",
+                    "input": raw,
+                }
+            ]
+        ) from exc
+    try:
+        return ROI.model_validate(data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
 
 
 @router.post(
@@ -118,7 +143,8 @@ def recognize(request: Request, body: RecognizeRequest, response: Response) -> R
     tags=["文件上传"],
     summary="文件上传识别",
     description="用文件上传方式发送图片（不用 base64 编码），功能和 `/v1/recognize` 一样。"
-    "\n\n`methods` 用逗号分隔，如 `ocr,template`；`templates` 同理。",
+    "\n\n`methods` 用逗号分隔，如 `ocr,template`；`templates` 同理。"
+    '\n\n`roi` 用 JSON 字符串，如 `{"x":0,"y":0,"w":100,"h":100}`。',
 )
 async def recognize_upload(
     request: Request,
@@ -132,13 +158,21 @@ async def recognize_upload(
     conf_threshold: float | None = Form(
         default=None, description="置信度门槛 0~1（可选，不填用默认值）"
     ),
+    roi: str | None = Form(default=None, description="ROI JSON 字符串（可选）"),
+    debug: bool = Form(default=False, description="是否返回调试标注图"),
+    cache: Literal["auto", "refresh", "off"] = Form(
+        default="auto", description="缓存行为：auto / refresh / off"
+    ),
+    merge: Literal["none", "priority", "dedup", "concat"] = Form(
+        default="none", description="合并策略：none / priority / dedup / concat"
+    ),
 ) -> RecognizeResponse:
     data = await file.read()
     enforce_byte_limit(data, max_bytes=_ctx(request).settings.max_image_bytes)
     img = decode_image_bytes(data)  # 解码一次,失败抛 INVALID_IMAGE;结果直接传给管线复用
     b64 = base64.b64encode(data).decode()
-    method_list: list[Method] = [m.strip() for m in methods.split(",") if m.strip()]  # type: ignore[misc]
-    template_list = [t.strip() for t in templates.split(",")] if templates else None
+    method_list = cast(list[Method], [m.strip() for m in methods.split(",") if m.strip()])
+    template_list = [t.strip() for t in templates.split(",") if t.strip()] if templates else None
     try:
         req = RecognizeRequest(
             image=ImageInput(base64=b64),
@@ -146,6 +180,10 @@ async def recognize_upload(
             model=model,
             templates=template_list,
             conf_threshold=conf_threshold,
+            roi=_parse_upload_roi(roi),
+            debug=debug,
+            cache=cache,
+            merge=merge,
         )
     except ValidationError as exc:
         # 手工构造模型的校验失败不会被 FastAPI 自动接管,

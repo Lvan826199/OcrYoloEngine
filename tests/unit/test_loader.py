@@ -1,4 +1,5 @@
 import base64
+import os
 
 import cv2
 import numpy as np
@@ -66,3 +67,15 @@ def test_load_from_path_empty_whitelist_blocks_all(tmp_path):
     with pytest.raises(EngineError) as ei:
         load_from_path(str(p), allowed_roots=[])
     assert ei.value.code is ErrorCode.PATH_NOT_ALLOWED
+
+
+@pytest.mark.skipif(os.name != "nt", reason="大小写不敏感路径白名单只在 Windows 上验证")
+def test_load_from_path_windows_whitelist_is_case_insensitive(tmp_path):
+    p = tmp_path / "a.png"
+    png_data = _png_bytes()
+    p.write_bytes(png_data)
+
+    raw, img = load_from_path(str(p), allowed_roots=[str(tmp_path).upper()])
+
+    assert raw == png_data
+    assert img.shape == (3, 4, 3)

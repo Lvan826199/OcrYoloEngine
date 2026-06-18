@@ -99,7 +99,7 @@ def compute_cache_key(image_bytes: bytes, req: RecognizeRequest) -> str:
     但哈希量小一个量级(4K PNG 数 MB vs 解码后约 48MB)。代价是同图不同编码
     不共享缓存条目——只是少一次命中机会,正确性不受影响。
 
-    规范化:methods 排序、model、templates 排序、有效 conf_threshold(None 原样)、
+    规范化:methods 原始顺序、model、templates 原始顺序、有效 conf_threshold(None 原样)、
     roi 的 model_dump、merge 策略。cache/debug 不参与键计算
     (它们决定是否读写缓存,而非结果本身)。merge 改变输出,必须入键以免串味。
     """
@@ -107,9 +107,11 @@ def compute_cache_key(image_bytes: bytes, req: RecognizeRequest) -> str:
     hasher.update(image_bytes)
 
     params: dict[str, object] = {
-        "methods": sorted(req.methods),
+        # methods/templates 的顺序会影响 priority 短路与响应中 detections 的顺序,
+        # 缓存键必须保留调用方给出的顺序,避免同图同参数但顺序不同的请求串缓存。
+        "methods": list(req.methods),
         "model": req.model,
-        "templates": sorted(req.templates) if req.templates else None,
+        "templates": list(req.templates) if req.templates else None,
         "conf_threshold": req.conf_threshold,
         "roi": req.roi.model_dump() if req.roi is not None else None,
         # merge 影响 merged 输出,纳入键;不同 merge 不复用同一条目,避免串味。

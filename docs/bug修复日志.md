@@ -6,6 +6,54 @@
 
 ---
 
+## 2026-06-18 工程收口修复批次
+
+> 配套计划:`plan/2026-06-18-工程收口修复计划.md`。
+
+### 结果缓存忽略顺序敏感参数
+
+- **现象**:开启结果缓存后,同一张图用 `merge=priority` 分别请求 `methods=["template","ocr"]` 与 `methods=["ocr","template"]`,可能复用同一个缓存条目;多模板请求也存在响应顺序被缓存键吞掉的风险。
+- **根因**:`compute_cache_key` 为提高复用率把 `methods` 与 `templates` 排序,但 `priority` 短路依赖 methods 顺序,模板匹配响应也按 templates 顺序生成。
+- **修法**:缓存键保留调用方传入的 `methods` / `templates` 原始顺序,仍继续忽略只影响读写策略的 `cache` 字段。
+- **验证**:新增单测 `test_cache_key_keeps_order_sensitive_params`,断言 methods 顺序与 templates 顺序变化都会生成不同缓存键。
+
+### Docker 开箱 demo 资产未进入镜像
+
+- **现象**:示例模板 `demo_block` 指向 `tests/fixtures/golden_patch.png`,但 Docker 镜像只复制 `src` 与 `configs`,容器内使用默认 `.example` 配置时找不到模板图。
+- **根因**:`docker/.dockerignore` 放在 `docker/` 子目录,而文档中的 `docker build -f docker/Dockerfile.cpu .` 使用仓库根目录作为上下文,实际不会读取该文件;Dockerfile 也没有复制 demo fixture。
+- **修法**:新增根目录 `.dockerignore`,默认排除测试目录与大资产,仅放行 `golden_patch.png` / `golden_scene.png`;CPU/GPU Dockerfile 显式复制这两个小体积 demo 图。
+- **验证**:新增单测 `test_root_dockerignore_keeps_context_small_but_allows_demo_fixtures`、`test_dockerfiles_copy_demo_template_assets` 守住构建上下文与 Dockerfile 复制规则。
+
+### 鉴权与校验错误未走统一错误契约
+
+- **现象**:API Key 缺失/错误返回 FastAPI 默认 `{"detail":...}`;请求体 422 校验失败也不是项目文档承诺的 `{request_id,error_code,message,details}` 结构。
+- **根因**:鉴权逻辑直接抛 `HTTPException`;应用只注册了 `EngineError` 处理器,没有接管 `RequestValidationError`。
+- **修法**:新增 `UNAUTHORIZED` 与 `VALIDATION_ERROR` 错误码;鉴权失败抛 `EngineError`;FastAPI 请求校验失败统一转成 `422 VALIDATION_ERROR`。
+- **验证**:更新契约测试 `test_auth_rejects_without_key_and_accepts_with_key`、`test_detect_requires_model_422`,断言 401/422 都带统一错误码和真实 `X-Request-ID`。
+
+### 运行配置缺少边界约束
+
+- **现象**:环境变量可把 `max_workers`、`request_timeout_s`、`max_image_bytes` 等关键运行参数设为 0 或负数,错误会延迟到线程池/请求处理阶段才暴露。
+- **根因**:`Settings` 只声明裸类型,未给 Pydantic 字段加范围约束。
+- **修法**:为置信度、缓存容量/TTL、并发、排队、超时、输入大小等字段补充 `Field` 约束。
+- **验证**:新增参数化单测 `test_invalid_runtime_limits_rejected`,覆盖 9 类非法配置。
+
+### upload 字段不完整
+
+- **现象**:`POST /v1/recognize/upload` 文档写着功能等同 `/v1/recognize`,但表单只支持 `methods/model/templates/conf_threshold`,缺少 `roi/debug/cache/merge`。
+- **根因**:upload 路由手工构造 `RecognizeRequest` 时没有透传这些可选字段。
+- **修法**:upload 表单新增 `roi`(JSON 字符串)、`debug`、`cache`、`merge`,并统一走 `RecognizeRequest` 校验。
+- **验证**:新增契约测试 `test_upload_supports_recognize_options`,真实 multipart 上传图片并断言 ROI 回映射、debug 标注图、`merge=concat` 与 `cache=off` 生效。
+
+### Windows 路径白名单大小写误拒
+
+- **现象**:Windows 上 `allowed_path_roots` 与实际路径大小写不一致时,合法路径可能被误判为不在白名单内。
+- **根因**:路径白名单比较只做 `realpath + startswith`,没有按平台大小写规则归一化。
+- **修法**:比较前对真实路径与白名单根目录统一执行 `os.path.normcase(os.path.realpath(...))`。
+- **验证**:新增 Windows 条件单测 `test_load_from_path_windows_whitelist_is_case_insensitive`。
+
+---
+
 ## 2026-06-18 接口边界修复批次
 
 > 配套计划:`plan/2026-06-18-接口边界修复计划.md`。

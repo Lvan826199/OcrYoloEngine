@@ -23,6 +23,7 @@
 - **本地工具配置隔离**：`.claude/`、`.agent/`、`.agents/`、`.codex/`、`.Codex/` 统一视为本机私有目录，只放权限、缓存、机器路径等内容，不跨工具同步、不入库。
 
 ### 修复
+- **工程收口修复批次**：结果缓存键保留 `methods` / `templates` 原始顺序，避免 `merge=priority` 等顺序敏感请求串缓存；Docker 镜像显式带上开箱 demo 小体积 fixture，根目录 `.dockerignore` 才作为真实构建上下文过滤规则；API Key 401 与请求校验 422 统一返回 `{request_id,error_code,message,details}`；运行配置补充范围约束；`/v1/recognize/upload` 补齐 `roi/debug/cache/merge` 字段；Windows 路径白名单比较支持大小写不敏感路径。新增 14 个默认测试，默认测试 149→163（含冒烟共 171）。
 - **upload 解码前限额补齐**：`/v1/recognize/upload` 现在与 base64/path 输入一致，先校验 `max_image_bytes` 再解码，超限返回 `413 IMAGE_TOO_LARGE`。
 - **单方式接口请求体简化**：`/v1/detect` 可只传 `image + model`，`/v1/match` 可只传 `image + templates`，不再强制额外传 `methods`；旧请求格式继续兼容。新增 3 个契约测试，默认测试 146→149（含冒烟共 157）。
 

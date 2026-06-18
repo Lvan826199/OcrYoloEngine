@@ -1,0 +1,27 @@
+.git
+.venv
+.uv-cache
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+
+docs
+plan
+skills
+
+# 默认不把测试目录放进镜像构建上下文,只保留开箱 demo 所需的小体积 fixture。
+tests/**
+!tests/
+!tests/fixtures/
+!tests/fixtures/golden_patch.png
+!tests/fixtures/golden_scene.png
+
+models_store
+templates_store
+*.pt
+*.pth
+*.weights
+*.onnx
+*.log

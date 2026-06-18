@@ -133,3 +133,33 @@ def test_cache_key_ignores_cache_mode():
         image=ImageInput(base64=b64), methods=["template"], templates=["patch"], cache="refresh"
     )
     assert compute_cache_key(raw, req_auto) == compute_cache_key(raw, req_refresh)
+
+
+def test_cache_key_keeps_order_sensitive_params():
+    """methods/templates 顺序会影响 priority 短路与响应顺序,缓存键不能排序吞掉差异。"""
+    img = np.full((20, 20, 3), 128, dtype=np.uint8)
+    raw = _png_bytes(img)
+    b64 = _b64_of(img)
+    req_template_first = RecognizeRequest(
+        image=ImageInput(base64=b64),
+        methods=["template", "ocr"],
+        templates=["patch", "other"],
+        merge="priority",
+    )
+    req_ocr_first = RecognizeRequest(
+        image=ImageInput(base64=b64),
+        methods=["ocr", "template"],
+        templates=["patch", "other"],
+        merge="priority",
+    )
+    req_template_order_changed = RecognizeRequest(
+        image=ImageInput(base64=b64),
+        methods=["template", "ocr"],
+        templates=["other", "patch"],
+        merge="priority",
+    )
+
+    assert compute_cache_key(raw, req_template_first) != compute_cache_key(raw, req_ocr_first)
+    assert compute_cache_key(raw, req_template_first) != compute_cache_key(
+        raw, req_template_order_changed
+    )

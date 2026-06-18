@@ -8,9 +8,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from ocr_yolo_engine.errors import EngineError
+from ocr_yolo_engine.errors import EngineError, ErrorCode
 from ocr_yolo_engine.observability.logging import (
     bind_request_id,
     current_request_id,
@@ -81,6 +83,17 @@ def create_app(ctx: AppContext | None = None, settings: Settings | None = None) 
         return JSONResponse(
             status_code=exc.http_status, content=exc.to_body(current_request_id()), headers=headers
         )
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        err = EngineError(
+            ErrorCode.VALIDATION_ERROR,
+            "请求格式有误",
+            details={"errors": jsonable_encoder(exc.errors())},
+        )
+        return JSONResponse(status_code=err.http_status, content=err.to_body(current_request_id()))
 
     @app.get("/", include_in_schema=False)
     async def _root() -> RedirectResponse:

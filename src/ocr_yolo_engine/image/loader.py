@@ -40,8 +40,9 @@ def load_from_path(
     max_bytes 不为 None 时在解码前校验字节上限(防解压炸弹先吃内存)。
     """
     real = os.path.realpath(path)
-    roots = [os.path.realpath(r) for r in allowed_roots]
-    if not any(real == r or real.startswith(r + os.sep) for r in roots):
+    real_cmp = os.path.normcase(real)
+    roots = [os.path.normcase(os.path.realpath(r)) for r in allowed_roots]
+    if not any(real_cmp == r or real_cmp.startswith(r + os.sep) for r in roots):
         raise EngineError(
             ErrorCode.PATH_NOT_ALLOWED,
             "路径不在允许的根目录白名单内",

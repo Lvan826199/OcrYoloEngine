@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 
 import cv2
@@ -232,6 +233,33 @@ def test_upload_template_match_end_to_end(client):
     assert abs(cy - PATCH_CENTER[1]) <= 3
 
 
+def test_upload_supports_recognize_options(client):
+    """upload 与 /v1/recognize 字段保持一致:支持 roi/debug/cache/merge。"""
+    img = make_scene_with_patch(SCENE_W, SCENE_H, (60, 40, 12, 12))
+    ok, buf = cv2.imencode(".png", img)
+    assert ok
+    r = client.post(
+        "/v1/recognize/upload",
+        files={"file": ("scene.png", buf.tobytes(), "image/png")},
+        data={
+            "methods": "template",
+            "templates": TEMPLATE_NAME,
+            "roi": json.dumps({"x": 50, "y": 30, "w": 45, "h": 45}),
+            "debug": "true",
+            "cache": "off",
+            "merge": "concat",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers["X-Cache"] == "BYPASS"
+    body = r.json()
+    assert body["debug_image"] is not None
+    assert body["merged"], "merge=concat 应返回统一结果列表"
+    cx, cy = body["method_results"]["template"]["detections"][0]["center"]
+    assert abs(cx - 66) <= 3
+    assert abs(cy - 46) <= 3
+
+
 def test_upload_yolo_without_model_returns_422(client):
     """upload methods=yolo 缺 model:与 JSON 接口一致返回 422。"""
     ok, buf = cv2.imencode(".png", np.zeros((10, 10, 3), dtype=np.uint8))
@@ -273,6 +301,9 @@ def test_detect_requires_model_422(client, scene_with_target_b64):
         json={"image": {"base64": scene_with_target_b64}, "methods": ["yolo"]},
     )
     assert r.status_code == 422
+    body = r.json()
+    assert body["error_code"] == "VALIDATION_ERROR"
+    assert body["request_id"] == r.headers["X-Request-ID"]
 
 
 def test_detect_single_method_body_does_not_require_methods(client, scene_with_target_b64):
@@ -314,6 +345,8 @@ def test_auth_rejects_without_key_and_accepts_with_key(scene_with_target_b64):
     }
     r = c.post("/v1/match", json=body)
     assert r.status_code == 401
+    assert r.json()["error_code"] == "UNAUTHORIZED"
+    assert r.json()["request_id"] == r.headers["X-Request-ID"]
     r2 = c.post("/v1/match", json=body, headers={"X-API-Key": "secret"})
     assert r2.status_code == 200
 
