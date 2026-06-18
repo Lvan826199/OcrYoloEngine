@@ -66,6 +66,54 @@ class RecognizeRequest(BaseModel):
         return self
 
 
+class DetectRequest(BaseModel):
+    """单方式目标检测请求：客户端无需传 methods,路由内部固定为 yolo。"""
+
+    image: ImageInput = Field(description="要识别的图片")
+    model: str = Field(min_length=1, description="YOLO 模型名")
+    conf_threshold: float | None = Field(default=None, ge=0.0, le=1.0, description="置信度门槛 0~1")
+    roi: ROI | None = Field(default=None, description="只识别图片中的这个区域")
+    debug: bool = Field(default=False, description="设为 true 时额外返回标注图")
+    cache: Literal["auto", "refresh", "off"] = Field(
+        default="auto", description="缓存行为：auto/refresh/off"
+    )
+
+    def to_recognize_request(self) -> RecognizeRequest:
+        return RecognizeRequest(
+            image=self.image,
+            methods=["yolo"],
+            model=self.model,
+            conf_threshold=self.conf_threshold,
+            roi=self.roi,
+            debug=self.debug,
+            cache=self.cache,
+        )
+
+
+class MatchRequest(BaseModel):
+    """单方式模板匹配请求：客户端无需传 methods,路由内部固定为 template。"""
+
+    image: ImageInput = Field(description="要识别的图片")
+    templates: list[str] = Field(min_length=1, description="模板名列表")
+    conf_threshold: float | None = Field(default=None, ge=0.0, le=1.0, description="置信度门槛 0~1")
+    roi: ROI | None = Field(default=None, description="只识别图片中的这个区域")
+    debug: bool = Field(default=False, description="设为 true 时额外返回标注图")
+    cache: Literal["auto", "refresh", "off"] = Field(
+        default="auto", description="缓存行为：auto/refresh/off"
+    )
+
+    def to_recognize_request(self) -> RecognizeRequest:
+        return RecognizeRequest(
+            image=self.image,
+            methods=["template"],
+            templates=self.templates,
+            conf_threshold=self.conf_threshold,
+            roi=self.roi,
+            debug=self.debug,
+            cache=self.cache,
+        )
+
+
 class Detection(BaseModel):
     """单个检测结果。"""
 

@@ -6,6 +6,26 @@
 
 ---
 
+## 2026-06-18 接口边界修复批次
+
+> 配套计划:`plan/2026-06-18-接口边界修复计划.md`。
+
+### upload 字节上限仍晚于解码
+
+- **现象**:`POST /v1/recognize/upload` 上传超过 `OYE_MAX_IMAGE_BYTES` 的非法图片字节时返回 `400 INVALID_IMAGE`,说明请求先进了图片解码逻辑,没有像 base64/path 路径一样先做字节上限校验。
+- **根因**:upload 路由为避免重复解码,在路由内先 `decode_image_bytes(data)`,但没有在解码前调用 `enforce_byte_limit`;后续管线的 `enforce_limits` 已经太晚。
+- **修法**:upload 路由读取 multipart 文件后,按当前 `ctx.settings.max_image_bytes` 先调用 `enforce_byte_limit`,通过后才解码并把预加载图传给管线。
+- **验证**:新增契约测试 `test_upload_oversized_bytes_rejected_before_decode`(真实 multipart 上传 1024 字节随机数据 + `max_image_bytes=64`,断言 `413 IMAGE_TOO_LARGE` 而非 400)。
+
+### 单方式接口错误要求 methods 字段
+
+- **现象**:`/v1/detect` 明明只做 YOLO,仍要求请求体传 `methods:["yolo"]`;`/v1/match` 明明只做模板匹配,仍要求 `methods:["template"]`。省略 `methods` 会在进入路由前返回 422。
+- **根因**:两个单方式路由直接把请求体声明为 `RecognizeRequest`,而 `RecognizeRequest.methods` 是必填字段;路由里再改 `body.methods` 已经发生在 Pydantic 校验之后。
+- **修法**:新增 `DetectRequest` 与 `MatchRequest` 单方式请求模型,分别只要求 `image + model`、`image + templates`,路由内部转换成固定 methods 的 `RecognizeRequest`;旧客户端额外传 `methods` 仍被兼容忽略。
+- **验证**:新增契约测试 `test_match_single_method_body_does_not_require_methods`、`test_detect_single_method_body_does_not_require_methods`;前者真实模板匹配成功,后者省略 methods 后进入模型注册表校验并返回 `404 MODEL_NOT_FOUND`。
+
+---
+
 ## 2026-06-10 训练教程批次
 
 > 配套计划:`plan/2026-06-10-yolo训练教程.md`。

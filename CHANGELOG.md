@@ -20,6 +20,10 @@
 - **bug 修复日志改为长期文档**：迁移至 `docs/bug修复日志.md`（倒序累积，现象/根因/修法/验证），`plan/` 目录今后只放计划类文档；文档同步策略与 Bug 修复策略正式写入 `CLAUDE.md`。
 - **跨机共享的项目记忆**：新增根目录 `MEMORY.md`（工作偏好 + 跨会话注意事项），由 `CLAUDE.md` 经 `@MEMORY.md` import 自动加载，随 git 在多台电脑间同步。
 
+### 修复
+- **upload 解码前限额补齐**：`/v1/recognize/upload` 现在与 base64/path 输入一致，先校验 `max_image_bytes` 再解码，超限返回 `413 IMAGE_TOO_LARGE`。
+- **单方式接口请求体简化**：`/v1/detect` 可只传 `image + model`，`/v1/match` 可只传 `image + templates`，不再强制额外传 `methods`；旧请求格式继续兼容。新增 3 个契约测试，默认测试 146→149（含冒烟共 157）。
+
 ## [0.2.1] - 2026-06-10
 
 > 全量代码校验后的集中修复批次，计划见 `plan/2026-06-10-代码校验修复计划.md`,逐条修复记录见 `docs/bug修复日志.md`。

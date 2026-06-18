@@ -244,12 +244,45 @@ def test_upload_yolo_without_model_returns_422(client):
     assert r.status_code == 422
 
 
+def test_upload_oversized_bytes_rejected_before_decode():
+    """upload 超限字节必须先返回 413,不能先进解码逻辑变成 400。"""
+    c = make_client(settings=Settings(api_keys=[], allowed_path_roots=[], max_image_bytes=64))
+    r = c.post(
+        "/v1/recognize/upload",
+        files={"file": ("too-large.bin", os.urandom(1024), "application/octet-stream")},
+        data={"methods": "template", "templates": TEMPLATE_NAME},
+    )
+    assert r.status_code == 413
+    assert r.json()["error_code"] == "IMAGE_TOO_LARGE"
+
+
+def test_match_single_method_body_does_not_require_methods(client, scene_with_target_b64):
+    """单方式 match 接口只需要 image + templates,不应强迫用户额外传 methods。"""
+    r = client.post(
+        "/v1/match",
+        json={"image": {"base64": scene_with_target_b64}, "templates": [TEMPLATE_NAME]},
+    )
+    assert r.status_code == 200
+    dets = r.json()["method_results"]["template"]["detections"]
+    assert dets
+
+
 def test_detect_requires_model_422(client, scene_with_target_b64):
     r = client.post(
         "/v1/detect",
         json={"image": {"base64": scene_with_target_b64}, "methods": ["yolo"]},
     )
     assert r.status_code == 422
+
+
+def test_detect_single_method_body_does_not_require_methods(client, scene_with_target_b64):
+    """单方式 detect 提供 image + model 后应进入模型查找,而不是 methods 缺失的 422。"""
+    r = client.post(
+        "/v1/detect",
+        json={"image": {"base64": scene_with_target_b64}, "model": "missing"},
+    )
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "MODEL_NOT_FOUND"
 
 
 def test_models_listing(client):

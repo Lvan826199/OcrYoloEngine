@@ -12,7 +12,15 @@ from pydantic import ValidationError
 from ocr_yolo_engine.image.loader import decode_image_bytes
 from ocr_yolo_engine.observability import metrics
 from ocr_yolo_engine.pipeline_runner import run_recognition
-from ocr_yolo_engine.schemas import ImageInput, Method, RecognizeRequest, RecognizeResponse
+from ocr_yolo_engine.preprocessing.pipeline import enforce_byte_limit
+from ocr_yolo_engine.schemas import (
+    DetectRequest,
+    ImageInput,
+    MatchRequest,
+    Method,
+    RecognizeRequest,
+    RecognizeResponse,
+)
 from ocr_yolo_engine.service.auth import require_api_key
 from ocr_yolo_engine.service.deps import AppContext
 
@@ -68,9 +76,8 @@ def ocr(request: Request, body: ImageInput, response: Response) -> RecognizeResp
     "\n\n需要在 `configs/models.yaml` 里登记模型。"
     "仓库自带通用模型 `yolov8n`（能识别人、车、动物等 80 类）。",
 )
-def detect(request: Request, body: RecognizeRequest, response: Response) -> RecognizeResponse:
-    body.methods = ["yolo"]
-    return _run(request, body, response)
+def detect(request: Request, body: DetectRequest, response: Response) -> RecognizeResponse:
+    return _run(request, body.to_recognize_request(), response)
 
 
 @router.post(
@@ -83,9 +90,8 @@ def detect(request: Request, body: RecognizeRequest, response: Response) -> Reco
     "\n\n需要在 `configs/templates.yaml` 里登记模板。"
     "仓库自带示例模板 `demo_block`，安装后即可体验。",
 )
-def match(request: Request, body: RecognizeRequest, response: Response) -> RecognizeResponse:
-    body.methods = ["template"]
-    return _run(request, body, response)
+def match(request: Request, body: MatchRequest, response: Response) -> RecognizeResponse:
+    return _run(request, body.to_recognize_request(), response)
 
 
 @router.post(
@@ -128,6 +134,7 @@ async def recognize_upload(
     ),
 ) -> RecognizeResponse:
     data = await file.read()
+    enforce_byte_limit(data, max_bytes=_ctx(request).settings.max_image_bytes)
     img = decode_image_bytes(data)  # 解码一次,失败抛 INVALID_IMAGE;结果直接传给管线复用
     b64 = base64.b64encode(data).decode()
     method_list: list[Method] = [m.strip() for m in methods.split(",") if m.strip()]  # type: ignore[misc]
